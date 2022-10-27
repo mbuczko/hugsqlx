@@ -1,0 +1,128 @@
+* Hug SQLx - embrace SQL
+
+Clojure world is lucky to have [[https://www.hugsql.org/][HugSQL]] & [[https://github.com/luminus-framework/conman][conman]] - 2 brilliant libraries which turn daily work with SQLs into a pure joy. Thanks to HugSql database queries are decoupled from the code and do not interfere with content of .clj files. Conman on the other hand transforms (interns) queries into plain clojure functions. Except that these functions are way smarter - underlaying magic takes you straight to postgres, sqlite or whatever DB keeps your data (and is supported by JDBC) and runs defined query with provided function arguments.
+
+Simple, yet so effective...
+
+** Motivation
+
+There are couple of things which hugsql + conman make exceptionally appealing:
+- keeping SQLs away from the code makes it easier to format them, get proper syntax coloring and what's even more important - allows to inject tons of comments without blowing source code out of proportion
+- assigning a name makes query easier to identify. Easier to indentify in a code, easier to find in logs when one needs to deduce which query just blown up production.
+- assigning a docstring makes it easier to understand author's intention - what the query does in summary, what to expect as a result?
+- last but not least - turning queries into functions gives you auto-completion and quick-doc-view out of the box (if you're lucky enough with your LSP)
+
+HugSqlx is still kind of proof-of-concept trying to materialize these ideas. Although crate is still at its newborn stage, it should be quite functional. Standing on the shoulders of awesome [[https://github.com/launchbadge/sqlx][SQLx]] it implements query-as-a-function concept for 3 major databases: postgres, sqlite and mysql. From a technical point of view, entire logic comes down to a simple (more or less..) code transformation which generates a static trait functions for you struct.
+
+** Deep dive into named queries
+
+The idea here is to distinguish 3 types of queries:
+- _typed_ ones - queries which return a result of concret type, like =User=. This is what SQLx returns with `query_as!`.
+- _untyped_ ones - querues which return a "raw" database result wrapped into database-specific type (=PgRow=, =SqliteRow= or =MysqlRow=)
+- _mapped_ ones - queries where result is transformed by a mapper function rather than coerced with type given upfront. This is what SQLx does by calling =query(..).map(|f| ...)=
+
+Each of these queries (with some exceptions mentioned below) might return different kind and number of results:
+- one result
+- many results 
+- optional result
+- stream of results
+
+In all cases result might be typed or it might be just a DB row. One exception to this classification a [[https://github.com/launchbadge/sqlx#querying][low-level "execute" query]] which is always _untyped_ and returns low-level DB-specific result (=PgQueryResult=, =SqliteQueryResult== or =MysqlQueryResult=).
+
+*** Query definition
+Queries are described by a simple structure:
+#+begin_src sql-mode :product ansi
+-- :name fetch_users
+-- :doc Returns all the users from DB
+SELECT user_id, email, name, picture FROM users
+#+end_src
+
+That's it! 2 lines of comments, one with =:name= identifier, the other one with =:doc= docstring. Note that name needs to be a valid identifier - it's used to generate a function name after all. Use it wisely, no whitechars, hyphens or any other weird characters if you don't want to be surprised by a panic :)
+
+=:doc= on the other hand gives more freedom. Place here anything you'd normally add as a function docstring. In case you'd need multiline docstring, go as following:
+
+#+begin_src sql-mode :product ansi
+-- :name set_picture
+-- :doc Sets user's picture.
+-- Picture is expected to be a valid URL.
+UPDATE users
+   -- expected URL to the picture
+   SET picture = ?
+ WHERE user_id = ?
+#+end_src
+
+See? you may also use a plain SQL comments inside. It's perfectly valid, as long as comment lines do not start with =-- :name= or =-- :doc=, obviously.
+
+*** Query type definition
+Going along with typed / untyped / mapped classification, here is how to add a type hint to query definition:
+
+#+begin_src sql-mode :product ansi
+  -- :name untyped_query
+  -- :name typed_query :as
+  -- :name mapped_query :map
+#+end_src
+
+Queries are *untyped by default*. Nothing's needed to instruct HugSqlx to generated ones. The other type however needs a hint - either =:as= (for typed query) or =:map= (for mapped query).
+
+*** Query result
+Again a hint is required to let code generator know what kind of result we expect:
+
+#+begin_src sql-mode :product ansi
+  -- :name execute
+  -- :name one_result :1
+  -- :name optional_result :?
+  -- :name many_results :*
+  -- :name stream_of_results :^
+#+end_src
+
+Analogically to query types, *"execute" query is default one*. No need for hint here. The other kind of result requires hinting - =:1= when query is expected to return exactly one result, =:?= if optional result is expected, =:*= for many results (vector) and =:^= for a stream of results.
+
+And this is all the theory. Both query- and result types can be mixed:
+
+#+begin_src sql-mode :product ansi
+  -- :name delete_user
+  -- :name fetch_user :as :?
+  -- :name fetch_users :as :*
+  -- :name fetch_profile :map :1
+#+end_src
+
+** Show me the Rust code!
+When using Hugsqlx, you need to decide first what database the code should be generated for. Switch corresponding feature in Cargo.toml dependency:
+
+#+begin_example
+  hugsqlx = {version = "0.1.0", features = ["sqlite"]}
+#+end_example
+
+Having dependency added, you may create a struct now:
+
+#+begin_src rust
+use hugsqlx::{params, HugSqlx};
+
+#[derive(HugSqlx)]
+#[queries = "resources/db/queries/users.sql"]
+struct Users {}
+#+end_src
+
+=queries= attribute needs to be a project-relative path and may point to either a single file (query definitions will be taken from this file only) or a directory. The later forces macro to traverse a path and generate corresponding functions upon found files.
+
+Alright, let's assume we have following query in "resources/db/queries/users.sql":
+#+begin_src sql-mode :product ansi
+-- :name fetch_users :map :*
+-- :doc Returns all the users from DB
+SELECT user_id, email, name, picture FROM users WHERE role=?
+#+end_src
+
+HugSqlx generates a trait function =fetch_users=, which might be shaped differently depending on provided query hints. Independently of hints, all the generated queries require at least 2 arguments - an =Executor= (Pool, PoolConnection or Connection) and query parameters. Mapped query, as expected, require one more parameter - a mapper function transforming DB row into a data of concrete type. Let's call the generated function for above query:
+
+#+begin_src rustic
+  let users = Users::fetch_users(&pool, params!["guest"], |row| { ... }).await?;
+#+end_src
+
+Parameters need to be passed with =params!= macro due to Rust mechanism which forbids creating a vector of elements of different types.
+
+** Limitations
+Query definition both with =:name= and =:doc= expects to have =:name= comment first. HugSqlx does not complain otherwise, but result might be surprising.
+
+No subfolders are recursively traversed to read query definitions.
+
+Also, because of SQLx limitation, no named parameters have been implemented yet.

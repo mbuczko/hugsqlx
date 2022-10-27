@@ -1,0 +1,18 @@
+[package]
+version = "0.1.0"
+name = "hugsqlx-derive"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+hugsqlx-core = { version = "0.1.0", path = "../hugsqlx-core" }
+syn = {version = "1", default-features = false, features = ["derive", "parsing", "proc-macro"]}
+proc-macro2 = "1"
+quote = "1"
+
+[features]
+postgres = ["hugsqlx-core/postgres"]
+sqlite = ["hugsqlx-core/sqlite"]
+mysql = ["hugsqlx-core/mysql"]

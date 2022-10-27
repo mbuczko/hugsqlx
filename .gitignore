@@ -1,0 +1,7 @@
+.envrc
+.cargo/config
+target
+build
+public
+Cargo.lock
+TAGS

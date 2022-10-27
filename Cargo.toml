@@ -1,0 +1,23 @@
+[package]
+name = "hugsqlx"
+version = "0.1.0"
+description = "A macro generating functions from SQL queries"
+repository = "https://github.com/mbuczko/hugsqlx"
+documentation = "https://docs.rs/hugsqlx/latest/hugsqlx/"
+readme = "README.org"
+authors = ["Michał Buczko"]
+edition = "2021"
+
+[lib]
+
+[workspace]
+members = ["hugsqlx-derive", "hugsqlx-core"]
+
+[dependencies]
+hugsqlx-derive = { version = "0.1.0", path = "hugsqlx-derive" }
+hugsqlx-core = { version = "0.1.0", path = "hugsqlx-core" }
+
+[features]
+postgres = ["hugsqlx-derive/postgres", "hugsqlx-core/postgres"]
+sqlite = ["hugsqlx-derive/sqlite", "hugsqlx-core/sqlite"]
+mysql = ["hugsqlx-derive/mysql", "hugsqlx-core/mysql"]

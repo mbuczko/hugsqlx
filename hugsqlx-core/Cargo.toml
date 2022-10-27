@@ -1,0 +1,17 @@
+[package]
+version = "0.1.0"
+name = "hugsqlx-core"
+edition = "2021"
+
+[dependencies]
+syn = {version = "1", default-features = false, features = ["derive", "parsing", "printing", "proc-macro"]}
+cfg-if = "1"
+proc-macro2 = "1"
+quote = "1"
+chumsky = "0.8.0"
+walkdir = "2.3.2"
+
+[features]
+postgres = []
+sqlite = []
+mysql = []
