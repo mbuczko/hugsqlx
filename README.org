@@ -12,7 +12,7 @@ There are couple of things which hugsql + conman make exceptionally appealing:
 - assigning a docstring makes it easier to understand author's intention - what the query does in summary, what to expect as a result?
 - last but not least - turning queries into functions provides auto-completion and quick doc view out of the box (if you're lucky enough with your LSP)
 
-HugSqlx is still kind of proof-of-concept, doing its best to materialize these ideas. Although crate is still at its newborn stage, it should be quite functional. Standing on the shoulders of awesome [[https://github.com/launchbadge/sqlx][SQLx]] it implements query-as-a-function concept for 3 major databases: postgres, sqlite and mysql. From a technical point of view, entire logic comes down to a simple (more or less..) code transformation which generates a static trait functions for you struct.
+HugSqlx is still kind of proof-of-concept, doing its best to materialize these ideas. Although crate is still at its newborn stage, it should be quite functional. Standing on the shoulders of awesome [[https://github.com/launchbadge/sqlx][SQLx]] it implements query-as-a-function concept for 3 major databases: postgres, sqlite and mysql. From a technical point of view, entire logic comes down to a simple (more or less..) code transformation which generates a static trait functions for your struct.
 
 ** Deep dive into named queries
 

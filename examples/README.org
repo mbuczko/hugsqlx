@@ -1,0 +1,18 @@
+* Sample queries
+1. Set up =DATABASE_URL= environmental variable:
+   #+begin_src shell
+export DATABASE_URL="sqlite:example.db"
+   #+end_src
+2. Create database
+   #+begin_src shell
+$ sqlx db create
+   #+end_src
+3. Run migrations
+   #+begin_src shell
+$ sqlx migrate run
+   #+end_src
+
+Run samples by:
+#+begin_src shell
+  cargo run
+#+end_src
