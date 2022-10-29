@@ -58,11 +58,11 @@ Going along with typed / untyped / mapped classification, here is how to add a t
 
 #+begin_src sql
   -- :name untyped_query
-  -- :name typed_query :as
-  -- :name mapped_query :map
+  -- :name typed_query :typed
+  -- :name mapped_query :mapped
 #+end_src
 
-Queries are *untyped by default*. Nothing's needed to instruct HugSqlx to generated ones. The other type however needs a hint - either =:as= (for typed query) or =:map= (for mapped query).
+Queries are *untyped by default*. Nothing's needed to instruct HugSqlx to generated ones. The other type however needs a hint - either =:typed= (aliased by =:<>=)for typed query, or =:mapped= (aliased by =:||=) for mapped query.
 
 *** Query result
 Again a hint is required to let code generator know what kind of result we expect:
@@ -81,9 +81,9 @@ And this is all the theory. Both query- and result types can be mixed:
 
 #+begin_src sql
   -- :name delete_user
-  -- :name fetch_user :as :?
-  -- :name fetch_users :as :*
-  -- :name fetch_profile :map :1
+  -- :name fetch_user :<> :?
+  -- :name fetch_users :<> :*
+  -- :name fetch_profile :mapped :1
 #+end_src
 
 ** Show me the Rust code!
@@ -107,7 +107,7 @@ struct Users {}
 
 Alright, let's assume we have following query in "resources/db/queries/users.sql":
 #+begin_src sql
--- :name fetch_users :map :*
+-- :name fetch_users :mapped :*
 -- :doc Returns all the users from DB
 SELECT user_id, email, name, picture FROM users WHERE role=?
 #+end_src

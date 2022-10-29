@@ -2,7 +2,7 @@ extern crate proc_macro;
 
 mod parser;
 
-use parser::{Call, Kind, Query};
+use parser::{Kind, Method, Query};
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use std::{env, fs, path::Path};
@@ -137,8 +137,8 @@ fn generate_typed_fn(
     let doc = q.doc.unwrap_or_default();
     let sql = q.sql;
 
-    output_ts.extend(match q.call {
-        Call::FetchMany => {
+    output_ts.extend(match q.method {
+        Method::FetchMany => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E, T> (conn: E, params: #args) -> futures_core::stream::BoxStream<'e, Result<T, sqlx::Error>>
@@ -148,7 +148,7 @@ fn generate_typed_fn(
                 }
             }
         },
-        Call::FetchOne => {
+        Method::FetchOne => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E, T> (conn: E, params: #args) -> Result<T, sqlx::Error>
@@ -158,7 +158,7 @@ fn generate_typed_fn(
                 }
             }
         },
-        Call::FetchOptional => {
+        Method::FetchOptional => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E, T> (conn: E, params: #args) -> Result<Option<T>, sqlx::Error>
@@ -168,7 +168,7 @@ fn generate_typed_fn(
                 }
             }
         },
-        Call::FetchAll => {
+        Method::FetchAll => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E, T> (conn: E, params: #args) -> Result<Vec<T>, sqlx::Error>
@@ -178,7 +178,7 @@ fn generate_typed_fn(
                 }
             }
         },
-        Call::Execute => {
+        Method::Execute => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E> (conn: E, params: #args) -> Result<#result, sqlx::Error>
@@ -199,8 +199,8 @@ fn generate_untyped_fn(
     let doc = q.doc.unwrap_or_default();
     let sql = q.sql;
 
-    output_ts.extend(match q.call {
-        Call::FetchMany => {
+    output_ts.extend(match q.method {
+        Method::FetchMany => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E> (conn: E, params: #args) -> futures_core::stream::BoxStream<'e, Result<#row, sqlx::Error>>
@@ -209,7 +209,7 @@ fn generate_untyped_fn(
                 }
             }
         },
-        Call::FetchOne => {
+        Method::FetchOne => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E> (conn: E, params: #args) -> Result<#row, sqlx::Error>
@@ -218,7 +218,7 @@ fn generate_untyped_fn(
                 }
             }
         },
-        Call::FetchOptional => {
+        Method::FetchOptional => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E> (conn: E, params: #args) -> Result<Option<#row>, sqlx::Error>
@@ -227,7 +227,7 @@ fn generate_untyped_fn(
                 }
             }
         },
-        Call::FetchAll => {
+        Method::FetchAll => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E> (conn: E, params: #args) -> Result<Vec<#row>, sqlx::Error>
@@ -236,7 +236,7 @@ fn generate_untyped_fn(
                 }
             }
         },
-        Call::Execute => {
+        Method::Execute => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E> (conn: E, params: #args) -> Result<#result, sqlx::Error>
@@ -257,8 +257,8 @@ fn generate_mapped_fn(
     let doc = q.doc.unwrap_or_default();
     let sql = q.sql;
 
-    output_ts.extend(match q.call {
-        Call::FetchMany => {
+    output_ts.extend(match q.method {
+        Method::FetchMany => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E, F, T> (conn: E, params: #args, mut mapper: F) -> futures_core::stream::BoxStream<'e, Result<T, sqlx::Error>>
@@ -271,7 +271,7 @@ fn generate_mapped_fn(
                 }
             }
         },
-        Call::FetchOne => {
+        Method::FetchOne => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E, F, T> (conn: E, params: #args, mut mapper: F) -> Result<T, sqlx::Error>
@@ -285,7 +285,7 @@ fn generate_mapped_fn(
                 }
             }
         },
-        Call::FetchOptional => {
+        Method::FetchOptional => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E, F, T> (conn: E, params: #args, mut mapper: F) -> Result<Option<T>, sqlx::Error>
@@ -299,7 +299,7 @@ fn generate_mapped_fn(
                 }
             }
         },
-        Call::FetchAll => {
+        Method::FetchAll => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E, F, T> (conn: E, params: #args, mut mapper: F) -> Result<Vec<T>, sqlx::Error>
@@ -313,7 +313,7 @@ fn generate_mapped_fn(
                 }
             }
         },
-        Call::Execute => {
+        Method::Execute => {
             quote! {
                 #[doc = #doc]
                 async fn #name<'e, E, F, T> (conn: E, params: #args) -> Result<#result, sqlx::Error>
@@ -362,5 +362,134 @@ cfg_if::cfg_if! {
                 }
             };
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::parser::{query_parser, Kind, Method};
+    use chumsky::Parser;
+
+    #[test]
+    fn parsing_defaults() {
+        let input = r#"
+-- :name fetch_users
+-- :doc Returns all the users from DB
+SELECT user_id, email, name, picture FROM users
+"#;
+
+        let queries = query_parser().parse(input).unwrap();
+        assert_eq!(queries.len(), 1);
+        assert_eq!(queries[0].name, "fetch_users");
+        assert_eq!(
+            queries[0].doc,
+            Some("Returns all the users from DB".to_string())
+        );
+        assert_eq!(queries[0].kind, Kind::Untyped);
+        assert_eq!(queries[0].method, Method::Execute);
+    }
+
+    #[test]
+    fn parsing_default_type() {
+        let input = r#"
+-- :name fetch_users :^
+SELECT user_id, email, name, picture FROM users
+"#;
+
+        let queries = query_parser().parse(input).unwrap();
+        assert_eq!(queries.len(), 1);
+        assert_eq!(queries[0].name, "fetch_users");
+        assert_eq!(queries[0].doc, None);
+        assert_eq!(queries[0].kind, Kind::Untyped);
+        assert_eq!(queries[0].method, Method::FetchMany);
+    }
+
+    #[test]
+    fn parsing_type_aliases() {
+        let input = r#"
+-- :name fetch_users :<> :^
+SELECT user_id, email, name, picture FROM users
+"#;
+
+        let queries = query_parser().parse(input).unwrap();
+        assert_eq!(queries.len(), 1);
+        assert_eq!(queries[0].name, "fetch_users");
+        assert_eq!(queries[0].doc, None);
+        assert_eq!(queries[0].kind, Kind::Typed);
+        assert_eq!(queries[0].method, Method::FetchMany);
+    }
+
+    #[test]
+    fn parsing_default_call_method() {
+        let input = r#"
+-- :name fetch_users :mapped
+SELECT user_id, email, name, picture FROM users
+"#;
+
+        let queries = query_parser().parse(input).unwrap();
+        assert_eq!(queries.len(), 1);
+        assert_eq!(queries[0].name, "fetch_users");
+        assert_eq!(queries[0].doc, None);
+        assert_eq!(queries[0].kind, Kind::Mapped);
+        assert_eq!(queries[0].method, Method::Execute);
+    }
+
+    #[test]
+    fn parsing_multiple() {
+        let input = r#"
+-- :name fetch_users
+-- :doc Returns all the users from DB
+SELECT user_id, email, name, picture FROM users
+
+-- :name fetch_user_by_id :untyped :1
+-- :doc Fetches user by its identifier
+SELECT user_id, email, name, picture
+  FROM users
+ WHERE user_id = $1
+
+-- :name set_picture :typed :1
+-- :doc Sets user's picture.
+-- Picture is expected to be a valid URL.
+UPDATE users
+   -- expected URL to the picture
+   SET picture = ?
+ WHERE user_id = ?
+
+-- :name delete_user :typed :1
+DELETE FROM users
+ WHERE user_id = ?
+"#;
+
+        let queries = query_parser().parse(input).unwrap();
+        assert_eq!(queries.len(), 4);
+
+        assert_eq!(queries[0].name, "fetch_users".to_string());
+        assert_eq!(
+            queries[0].doc,
+            Some("Returns all the users from DB".to_string())
+        );
+        assert_eq!(queries[0].kind, Kind::Untyped);
+        assert_eq!(queries[0].method, Method::Execute);
+
+        assert_eq!(queries[1].name, "fetch_user_by_id".to_string());
+        assert_eq!(
+            queries[1].doc,
+            Some("Fetches user by its identifier".to_string())
+        );
+        assert_eq!(queries[1].kind, Kind::Untyped);
+        assert_eq!(queries[1].method, Method::FetchOne);
+
+        assert_eq!(queries[2].name, "set_picture".to_string());
+        assert_eq!(
+            queries[2].doc,
+            Some("Sets user's picture.\nPicture is expected to be a valid URL.".to_string())
+        );
+        assert_eq!(queries[2].kind, Kind::Typed);
+        assert_eq!(queries[2].method, Method::FetchOne);
+
+        assert_eq!(queries[3].name, "delete_user".to_string());
+        assert_eq!(queries[3].doc, None);
+        assert_eq!(queries[3].kind, Kind::Typed);
+        assert_eq!(queries[3].method, Method::FetchOne);
     }
 }

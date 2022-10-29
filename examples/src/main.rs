@@ -6,10 +6,6 @@ use hugsqlx::{params, HugSqlx};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-#[derive(HugSqlx)]
-#[queries = "examples/resources/queries.sql"]
-struct Queries {}
-
 #[derive(Debug, sqlx::FromRow)]
 struct User {
     user_id: i32,
@@ -18,23 +14,27 @@ struct User {
     picture: String,
 }
 
-fn generate_email() -> String {
-    format!("janko-{}@foo.com", Uuid::new_v4())
+#[derive(HugSqlx)]
+#[queries = "examples/resources/queries.sql"]
+struct Users {}
+
+fn generate_email(name: &str) -> String {
+    format!("{}-{}@foo.com", name, Uuid::new_v4())
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
-    let email = generate_email();
+    let email = generate_email("janko");
 
     // insert single user and fetch data back from DB
-    let result = Queries::add_user(
+    let result = Users::add_user(
         &pool,
         params!(&email, "Janko Muzykant", "http://my.profile.image.com"),
     )
     .await?;
-    if let Some(user) = Queries::fetch_user_by_email::<_, User>(&pool, params!(email)).await? {
-        println!("user {:?}", user);
+    if let Some(user) = Users::fetch_user_by_email::<_, User>(&pool, params!(email)).await? {
+        println!("Stored user {:?}", user);
     } else {
         eprintln!("Somefink went really wrong. Insertion result: {:?}", result);
     }
@@ -46,7 +46,7 @@ async fn main() -> anyhow::Result<()> {
         ("Mallory", "http://profile-3.com"),
     ]
     .iter()
-    .map(|(name, picture)| Queries::add_user(&pool, params!(generate_email(), name, picture)))
+    .map(|(name, picture)| Users::add_user(&pool, params!(generate_email(name), name, picture)))
     .collect::<FuturesOrdered<_>>()
     .collect::<Vec<_>>()
     .await;
