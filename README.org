@@ -5,7 +5,7 @@ Clojure world is lucky to have [[https://www.hugsql.org/][HugSQL]] & [[https://g
 Simple, yet so effective...
 
 ** Motivation
-There are 3 main points where hugsql + conman lower the complexity barrier when dealing with SQLs:
+There are 3 main points where couple _(hugsql, conman)_ really shines when dealing with SQLs:
 - queries separated from the code - that brings proper formatting, syntax highlighting and better documentation (ability to add readable comments) out of the box. Your IDE is way happier to edit .sql file rather than SQLs inside rust source.
 - named queries - query becomes easier to identify. Easier to indentify in a code, easier to reason about in logs when one needs to deduce which query just blown up production. Your IDE is happy too being able to find query by name.
 - queries as documented functions - better way to understand author's intention - what the query does in summary, what to expect in result?
@@ -69,9 +69,9 @@ Again a hint is required to let code generator know what kind of result we expec
 
 #+begin_src sql
   -- :name execute
-  -- :name one_result :1
-  -- :name optional_result :?
-  -- :name many_results :*
+  -- :name one_result        :1
+  -- :name optional_result   :?
+  -- :name many_results      :*
   -- :name stream_of_results :^
 #+end_src
 
@@ -81,9 +81,9 @@ And this is all the theory. Both query- and result types can be mixed:
 
 #+begin_src sql
   -- :name delete_user
-  -- :name fetch_user :<> :?
-  -- :name fetch_users :<> :*
-  -- :name fetch_profile :mapped :1
+  -- :name fetch_user     :<> :?
+  -- :name fetch_users    :<> :*
+  -- :name fetch_profile  :mapped :1
 #+end_src
 
 ** Show me the Rust code!
