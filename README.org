@@ -87,7 +87,7 @@ And this is all the theory. Both query- and result types can be mixed:
 #+end_src
 
 ** Show me the Rust code!
-When using Hugsqlx, you need to decide first what database the code should be generated for. Switch corresponding feature in Cargo.toml dependency:
+When using Hugsqlx, you need to decide first what database (postgres, sqlite or mysql) the code should be generated for:
 
 #+begin_example
   hugsqlx = {version = "0.1.0", features = ["sqlite"]}
