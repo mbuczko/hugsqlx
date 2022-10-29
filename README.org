@@ -57,11 +57,12 @@ Going along with typed / untyped / mapped classification, here is how to add a t
 
 #+begin_src sql
   -- :name untyped_query
-  -- :name typed_query :typed
-  -- :name mapped_query :mapped
+  -- :name untyped_query :untyped
+  -- :name typed_query   :typed
+  -- :name mapped_query  :mapped
 #+end_src
 
-Queries are *untyped by default*. Nothing's needed to instruct HugSqlx to generated ones. The other type however needs a hint - either =:typed= (aliased by =:<>=)for typed query, or =:mapped= (aliased by =:||=) for mapped query.
+Queries are *untyped by default*. Nothing's needed to instruct HugSqlx to generated ones (though you may still use =:untyped= hint). The other type however needs a clear hint - either =:typed= one (aliased by =:<>=) for typed query, or =:mapped= (aliased by =:||=) one for mapped query.
 
 *** Query result
 Again a hint is required to let code generator know what kind of result we expect:
