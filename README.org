@@ -1,18 +1,17 @@
 * Hug SQLx - embrace SQL
 
-Clojure world is lucky to have [[https://www.hugsql.org/][HugSQL]] & [[https://github.com/luminus-framework/conman][conman]] - 2 brilliant libraries which turn daily work with SQLs into a pure joy. Thanks to HugSql database queries are decoupled from the code and do not interfere with content of .clj files. Conman on the other hand transforms (interns) queries into plain clojure functions. Except that these functions are way smarter - underlaying magic takes you straight to postgres, sqlite or whatever DB keeps your data (and is supported by JDBC) and runs defined query with provided function arguments.
+Clojure world is lucky to have [[https://www.hugsql.org/][HugSQL]] & [[https://github.com/luminus-framework/conman][conman]] - 2 brilliant libraries which make daily work with SQLs a real pleasure. HugSql decouples queries from the code, so they do not interfere with content of .clj files, and conman transforms (interns) queries into plain clojure functions. Functions created this way are quite smart - underlaying magic connects to postgres, sqlite or whatever DB keeps your data (and is supported by JDBC) and runs defined query with provided function arguments.
 
 Simple, yet so effective...
 
 ** Motivation
+There are 3 main points where hugsql + conman lower the complexity barrier when dealing with SQLs:
+- queries separated from the code - that brings proper formatting, syntax highlighting and better documentation (ability to add readable comments) out of the box. Your IDE is way happier to edit .sql file rather than SQLs inside rust source.
+- named queries - query becomes easier to identify. Easier to indentify in a code, easier to reason about in logs when one needs to deduce which query just blown up production. Your IDE is happy too being able to find query by name.
+- queries as documented functions - better way to understand author's intention - what the query does in summary, what to expect in result?
+- last but not least - queries turned into functions enable auto-completion and quick doc view out of the box (if you're lucky enough with your LSP)
 
-There are couple of things which hugsql + conman make exceptionally appealing:
-- keeping SQLs away from the code makes it easier to format them, get proper syntax highlighting and inject tons of query comments inside without blowing source code out of proportion
-- assigning a name makes query easier to identify. Easier to indentify in a code, easier to find in logs when one needs to deduce which query just blown up production.
-- assigning a docstring makes it easier to understand author's intention - what the query does in summary, what to expect as a result?
-- last but not least - turning queries into functions provides auto-completion and quick doc view out of the box (if you're lucky enough with your LSP)
-
-HugSqlx is still kind of proof-of-concept, doing its best to materialize these ideas. Although crate is still at its newborn stage, it should be quite functional. Standing on the shoulders of awesome [[https://github.com/launchbadge/sqlx][SQLx]] it implements query-as-a-function concept for 3 major databases: postgres, sqlite and mysql. From a technical point of view, entire logic comes down to a simple (more or less..) code transformation which generates a static trait functions for your struct.
+HugSqlx is still kind of proof-of-concept, doing its best to materialize these ideas. Although crate is at its newborn stage, it should be quite functional. Standing on the shoulders of awesome [[https://github.com/launchbadge/sqlx][SQLx]] it implements query-as-a-function concept for 3 major databases: postgres, sqlite and mysql. From a technical point of view, entire logic comes down to a simple (more or less..) code transformation which generates a static trait functions for your struct.
 
 ** Deep dive into named queries
 
