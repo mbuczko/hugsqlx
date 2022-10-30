@@ -1,11 +1,13 @@
 [package]
 name = "hugsqlx"
 version = "0.1.0"
-description = "A macro turning SQL queries into Rust functions"
+description = "Turning SQL queries into Rust functions"
 repository = "https://github.com/mbuczko/hugsqlx"
-documentation = "https://docs.rs/hugsqlx/latest/hugsqlx/"
 readme = "README.org"
 authors = ["Michał Buczko"]
+keywords = ["sql", "postgres", "sqlite", "mysql", "hugsql"]
+categories = ["database", "filesystem"]
+license = "MIT"
 edition = "2021"
 
 [lib]
