@@ -14,12 +14,7 @@ The idea here is to distinguish 3 types of queries:
 - _mapped_ ones - queries where result is transformed by a mapper function rather than coerced with type given upfront. This is what SQLx does by calling =query(..).map(|f| ...)=
 
 Each of these queries (with some exception mentioned below) might return different kind and number of results:
-- one result
-- many results 
-- optional result
-- stream of results
-
-In all cases result might be typed or it might be just a DB row. One exception to this classification a [[https://github.com/launchbadge/sqlx#querying][low-level "execute" query]] which is always _untyped_ and returns low-level DB-specific result (=PgQueryResult=, =SqliteQueryResult= or =MysqlQueryResult=).
+one result, many results, optional result or stream of results. In all cases result might be typed or it might be just a DB row. One exception to this classification a [[https://github.com/launchbadge/sqlx#querying][low-level "execute" query]] which is always _untyped_ and returns low-level DB-specific result (=PgQueryResult=, =SqliteQueryResult= or =MysqlQueryResult=).
 
 *** Query definition
 Queries are described by a simple structure:
@@ -29,7 +24,7 @@ Queries are described by a simple structure:
 SELECT user_id, email, name, picture FROM users
 #+end_src
 
-That's it! 2 lines of comments, one with =:name= identifier, the other one with =:doc= docstring. Note that name needs to be a valid identifier - it's used to generate a function name after all. Use it wisely, no whitechars, hyphens or any other weird characters if you don't want to be surprised by a panic :)
+Crucial part here are 2 lines of comments: one with =:name= identifier, the other one with =:doc= docstring. Note that name needs to be a valid identifier - it's used to generate a function name after all. Use it wisely, no whitechars, hyphens or any other weird characters if you don't want to be surprised by a panic :)
 
 =:doc= on the other hand gives more freedom. Place here anything you'd normally add as a function docstring. In case you'd need multiline docstring, go as following:
 
@@ -43,8 +38,7 @@ UPDATE users
  WHERE user_id = ?
 #+end_src
 
-See? you may also use a plain SQL comments inside. It's perfectly valid, as long as comment lines do not start with =-- :name= or =-- :doc=, obviously.
-
+This example also shows that it's perfectly valid to use SQL comments inside the query, as long as comment lines do not start with =-- :name= or =-- :doc=, obviously.
 *** Query type definition
 Going along with typed / untyped / mapped classification, here is how to add a type hint to query definition:
 
