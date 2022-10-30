@@ -1,20 +1,13 @@
 * Hug SQLx - embrace SQL
 
-Clojure world is lucky to have [[https://www.hugsql.org/][HugSQL]] & [[https://github.com/luminus-framework/conman][conman]] - 2 brilliant libraries which make daily work with SQLs a real pleasure. HugSql decouples queries from the code, so they do not interfere with content of .clj files, and conman transforms (interns) queries into plain clojure functions. Functions created this way are quite smart - underlaying magic connects to postgres, sqlite or whatever DB keeps your data (and is supported by JDBC) and runs defined query with provided function arguments.
+HugSQLx is a derive macro turning SQL queries into plain Rust functions. This is an attempt to decouple queries from source code, embrace IDE's ability to propertly format and syntax-highlight SQLs, and based on underlaying LSP - get auto-completing and docstrings for free.
 
-Simple, yet so effective...
-
-** Motivation
-There are 3 main points where couple _(hugsql, conman)_ really shines when dealing with SQLs:
-- queries separated from the code - that brings proper formatting, syntax highlighting and better documentation (ability to add readable comments) out of the box. Your IDE is way happier to edit .sql file rather than SQLs inside rust source.
-- named queries - query becomes easier to identify. Easier to indentify in a code, easier to reason about in logs when one needs to deduce which query just blown up production. Your IDE is happy too being able to find query by name.
-- queries as documented functions - better way to understand author's intention - what the query does in summary, what to expect in result?
-- last but not least - queries turned into functions enable auto-completion and quick doc view out of the box (if you're lucky enough with your LSP)
-
-HugSqlx is still kind of proof-of-concept, doing its best to materialize these ideas. Although crate is at its newborn stage, it should be quite functional. Standing on the shoulders of awesome [[https://github.com/launchbadge/sqlx][SQLx]] it implements query-as-a-function concept for 3 major databases: postgres, sqlite and mysql. From a technical point of view, entire logic comes down to a simple (more or less..) code transformation which generates a static trait functions for your struct.
-
+** Installation
+#+begin_src toml
+[dependencies]
+hugsqlx="0.1.0"
+#+end_src
 ** Deep dive into named queries
-
 The idea here is to distinguish 3 types of queries:
 - _typed_ ones - queries which return a result of concrete type, like =<User>=. This is what SQLx returns with =query_as!=.
 - _untyped_ ones - queries which return a "raw" database result wrapped into database-specific type (=PgRow=, =SqliteRow= or =MysqlRow=)
@@ -86,7 +79,7 @@ And this is all the theory. Both query- and result types can be mixed:
   -- :name fetch_profile  :mapped :1
 #+end_src
 
-** Show me the Rust code!
+** Back to code
 When using Hugsqlx, you need to decide first what database (postgres, sqlite or mysql) the code should be generated for:
 
 #+begin_example
@@ -103,9 +96,11 @@ use hugsqlx::{params, HugSqlx};
 struct Users {}
 #+end_src
 
-=queries= attribute needs to be a project-relative path and may point to either a single file (query definitions will be taken from this file only) or a directory. The later forces macro to traverse a path and generate corresponding functions upon found files.
+=queries= attribute needs to be a project (Cargo.toml) relative path and may point to either a single file (query definitions will be taken from this file only) or a directory. The later forces macro to traverse a path and generate corresponding functions upon found files.
 
-Alright, let's assume we have following query in "resources/db/queries/users.sql":
+Example:
+
+Assuming following query in "resources/db/queries/users.sql":
 #+begin_src sql
 -- :name fetch_users :mapped :*
 -- :doc Returns all the users from DB
