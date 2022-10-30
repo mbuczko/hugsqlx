@@ -80,7 +80,7 @@ Both query- and result types can be mixed:
 When using Hugsqlx, you need to decide first what database (postgres, sqlite or mysql) the code should be generated for:
 
 ``` toml
-  hugsqlx = {version = "0.1.0", features = ["sqlite"]}
+hugsqlx = {version = "0.1.0", features = ["sqlite"]}
 ```
 
 Having dependency added, time to add a struct:
