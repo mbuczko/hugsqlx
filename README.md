@@ -112,7 +112,7 @@ let users = Users::fetch_users(&pool, params!["guest"], |row| { ... }).await?;
 
 Parameters need to be passed with =params!= macro due to Rust mechanism which forbids creating a vector of elements of different types.
 
-** Tips & tricks (with Emacs)
+## Tips & tricks (with Emacs)
 ### How to get better syntax highlighting on comments with `:name` and `:doc`?
 
 ``` emacs-lisp
