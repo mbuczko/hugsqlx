@@ -89,7 +89,6 @@ pub(crate) fn query_parser() -> impl Parser<char, Vec<Query>, Error = Simple<cha
             text::keyword("mapped").to(Kind::Mapped),
             text::keyword("untyped").to(Kind::Untyped),
         )))
-        .recover_with(skip_then_retry_until([':']))
         .padded()
         .labelled("type");
 
