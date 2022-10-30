@@ -16,8 +16,8 @@ edition = "2021"
 members = ["hugsqlx-derive", "hugsqlx-core", "examples"]
 
 [dependencies]
-hugsqlx-derive = { version = "0.1.0", path = "hugsqlx-derive" }
-hugsqlx-core = { version = "0.1.0", path = "hugsqlx-core" }
+hugsqlx-derive = { version = "0.1.1", path = "hugsqlx-derive" }
+hugsqlx-core = { version = "0.1.1", path = "hugsqlx-core" }
 
 [dev-dependencies]
 async-trait = "0.1.58"
