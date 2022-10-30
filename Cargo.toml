@@ -1,7 +1,7 @@
 [package]
 name = "hugsqlx"
 version = "0.1.0"
-description = "A macro generating functions from SQL queries"
+description = "A macro turning SQL queries into Rust functions"
 repository = "https://github.com/mbuczko/hugsqlx"
 documentation = "https://docs.rs/hugsqlx/latest/hugsqlx/"
 readme = "README.org"
