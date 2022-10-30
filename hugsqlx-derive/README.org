@@ -1,2 +1,0 @@
-* HugSQLx derive macro
-Heart of [[https://github.com/mbuczko/hugsqlx][HugSQLx]] - a derive macro definition for Postgres, SQLite and MySql databases.

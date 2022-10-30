@@ -1,2 +1,0 @@
-* HugSQLx implementation
-This crate contains implementation for [[https://github.com/mbuczko/hugsqlx][HugSQLx derive macro]].
