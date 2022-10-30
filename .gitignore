@@ -1,5 +1,6 @@
 .envrc
 .cargo/config
+.projectile
 target
 build
 public

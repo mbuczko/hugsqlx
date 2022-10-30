@@ -120,6 +120,19 @@ HugSqlx generates a trait function =fetch_users=, which might be shaped differen
 
 Parameters need to be passed with =params!= macro due to Rust mechanism which forbids creating a vector of elements of different types.
 
+** Tips & tricks (with Emacs)
+*** How to get better syntax highlighting on comments with =:name= and =:doc=?
+#+begin_src emacs-lisp
+(font-lock-add-keywords
+ 'sql-mode `(("\".+?\"" 0 'font-lock-string-face t)
+             (":[a-zA-Z0-9+-><?!\\*\\|]?+" 0 'font-lock-constant-face t)
+             (":name \\([[:graph:]]+\\)" 1 'font-lock-function-name-face t)))
+#+end_src
+*** How to get get ctags working with named queries?
+#+begin_example
+--kinddef-sql=q,query,Queries
+--regex-sql=/\-\-[ \t]+(:name[\ \t]+)([[:alnum:]_-]+)/\2/q/
+#+end_example
 ** Limitations
 Query definition both with =:name= and =:doc= expects to have =:name= comment first. HugSqlx does not complain otherwise, but result might be surprising.
 
