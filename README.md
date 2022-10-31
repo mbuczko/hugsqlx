@@ -4,10 +4,16 @@ HugSQLx is a derive macro turning SQL queries into plain Rust functions. This is
 
 ## Installation
 
+HugSQLx stands on a shoulders of 2 other crates: [async_trait](https://crates.io/crates/async-trait) and [SQLx](https://crates.io/crates/sqlx):
+
 ``` toml
 [dependencies]
-hugsqlx="0.1.2" 
+async-trait = "0.1.58"
+sqlx = { version = "0.6.2", features = ["sqlite"] }
+hugsqlx = { version = "0.1.2", features = ["sqlite"] }
 ```
+
+Both HugSQLx and SQLx itself should have the same database mentioned in *features* (sqlite, postgres or mysql).
 
 ## Deep dive into named queries
 The idea here is to distinguish 3 types of queries:
