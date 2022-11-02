@@ -48,6 +48,12 @@ async fn main() -> anyhow::Result<()> {
 
     assert_eq!(results.len(), 3);
 
+    // list only 2 users (mutate the query before run)
+    let users =
+        Users::fetch_limited_users::<_, User>(&pool, |sql| sql.to_owned() + "\nLIMIT 2", params!()).await?;
+
+    println!("First 2 users created: {:?}", users);
+
     if let Ok(row) = results.first().unwrap() {
         let id = row.try_get::<i64, _>(0).unwrap();
         let email = row.try_get::<String, _>(1).unwrap();
