@@ -6,3 +6,6 @@ build
 public
 Cargo.lock
 TAGS
+*.db
+*.db-shm
+*.db-wal
