@@ -20,3 +20,9 @@ SELECT picture, name
 -- :doc Deletes user based on its identifier
 DELETE FROM USERS where user_id = ?
 
+-- :name fetch_limited_users :<> :* :adapt
+-- :doc Returns users of given names
+SELECT user_id, email, name, picture
+  FROM users
+ ORDER BY created_at
+  -- adapt the query by adding LIMIT

@@ -3,8 +3,8 @@ extern crate proc_macro;
 mod parser;
 
 use parser::{Kind, Method, Query};
-use proc_macro2::TokenStream as TokenStream2;
-use quote::{format_ident, quote};
+use proc_macro2::{Ident, Literal, Span, TokenStream as TokenStream2, TokenTree};
+use quote::quote;
 use std::{env, fs, path::Path};
 use syn::{parse_str, Lit, Meta, MetaNameValue, Type};
 
@@ -131,56 +131,70 @@ fn generate_impl_fns(queries: Vec<Query>, ctx: &Context, output_ts: &mut TokenSt
     }
 }
 
+fn build_adapter_arg(query: &Query) -> (TokenStream2, TokenStream2) {
+    let sql = &query.sql;
+    if query.adapt {
+        return (
+            quote! { adapter: impl FnOnce(&str) -> String + Send, },
+            quote! { &adapter(#sql) },
+        );
+    }
+    (
+        TokenStream2::new(),
+        TokenStream2::from(TokenTree::Literal(Literal::string(sql))),
+    )
+}
+
 fn generate_typed_fn(
     q: Query,
     Context(db, args, row, result): &Context,
     output_ts: &mut TokenStream2,
 ) {
-    let name = format_ident!("{}", q.name);
-    let sql = q.sql;
+    let (adapter, sql) = build_adapter_arg(&q);
+    let name = Ident::new(&q.name, Span::call_site());
 
     output_ts.extend(match q.method {
         Method::FetchMany => {
             quote! {
-                async fn #name<'e, E, T> (conn: E, params: #args) -> futures_core::stream::BoxStream<'e, Result<T, sqlx::Error>>
+                async fn #name<'e, E, T> (executor: E, #adapter params: #args) -> futures_core::stream::BoxStream<'e, Result<T, sqlx::Error>>
                 where E: sqlx::Executor<'e, Database = #db>,
                       T: Send + Unpin + for<'r> sqlx::FromRow<'r, #row> + 'e {
-                    sqlx::query_as_with(#sql, params).fetch(conn)
+                    sqlx::query_as_with(#sql, params).fetch(executor)
                 }
             }
         },
         Method::FetchOne => {
             quote! {
-                async fn #name<'e, E, T> (conn: E, params: #args) -> Result<T, sqlx::Error>
+                async fn #name<'e, E, T> (executor: E, #adapter params: #args) -> Result<T, sqlx::Error>
                 where E: sqlx::Executor<'e, Database = #db>,
                       T: Send + Unpin + for<'r> sqlx::FromRow<'r, #row> + 'e {
-                    sqlx::query_as_with(#sql, params).fetch_one(conn).await
+                    sqlx::query_as_with(#sql, params).fetch_one(executor).await
                 }
             }
         },
         Method::FetchOptional => {
             quote! {
-                async fn #name<'e, E, T> (conn: E, params: #args) -> Result<Option<T>, sqlx::Error>
+                async fn #name<'e, E, T> (executor: E, #adapter params: #args) -> Result<Option<T>, sqlx::Error>
                 where E: sqlx::Executor<'e, Database = #db>,
                       T: Send + Unpin + for<'r> sqlx::FromRow<'r, #row> + 'e {
-                    sqlx::query_as_with(#sql, params).fetch_optional(conn).await
+                    sqlx::query_as_with(#sql, params).fetch_optional(executor).await
                 }
             }
         },
         Method::FetchAll => {
             quote! {
-                async fn #name<'e, E, T> (conn: E, params: #args) -> Result<Vec<T>, sqlx::Error>
+                async fn #name<'e, E, T> (executor: E, #adapter params: #args) -> Result<Vec<T>, sqlx::Error>
                 where E: sqlx::Executor<'e, Database = #db>,
-                      T: Send + Unpin + for<'r> sqlx::FromRow<'r, #row> + 'e {
-                    sqlx::query_as_with(#sql, params).fetch_all(conn).await
+                      T: Send + Unpin + for<'r> sqlx::FromRow<'r, #row> + 'e, {
+                    sqlx::query_as_with(#sql, params).fetch_all(executor).await
                 }
             }
         },
         Method::Execute => {
             quote! {
-                async fn #name<'e, E> (conn: E, params: #args) -> Result<#result, sqlx::Error>
+                async fn #name<'e, E> (executor: E, #adapter params: #args) -> Result<#result, sqlx::Error>
                 where E: sqlx::Executor<'e, Database = #db> {
-                    sqlx::query_with(#sql, params).execute(conn).await
+                    sqlx::query_with(#sql, params).execute(executor).await
                 }
             }
         },
@@ -192,47 +206,47 @@ fn generate_untyped_fn(
     Context(db, args, row, result): &Context,
     output_ts: &mut TokenStream2,
 ) {
-    let name = format_ident!("{}", q.name);
-    let sql = q.sql;
+    let (adapter, sql) = build_adapter_arg(&q);
+    let name = Ident::new(&q.name, Span::call_site());
 
     output_ts.extend(match q.method {
         Method::FetchMany => {
             quote! {
-                async fn #name<'e, E> (conn: E, params: #args) -> futures_core::stream::BoxStream<'e, Result<#row, sqlx::Error>>
+                async fn #name<'e, E> (executor: E, #adapter params: #args) -> futures_core::stream::BoxStream<'e, Result<#row, sqlx::Error>>
                 where E: sqlx::Executor<'e, Database = #db> {
-                    sqlx::query_with(#sql, params).fetch(conn)
+                    sqlx::query_with(#sql, params).fetch(executor)
                 }
             }
         },
         Method::FetchOne => {
             quote! {
-                async fn #name<'e, E> (conn: E, params: #args) -> Result<#row, sqlx::Error>
+                async fn #name<'e, E> (executor: E, #adapter params: #args) -> Result<#row, sqlx::Error>
                 where E: sqlx::Executor<'e, Database = #db> {
-                    sqlx::query_with(#sql, params).fetch_one(conn).await
+                    sqlx::query_with(#sql, params).fetch_one(executor).await
                 }
             }
         },
         Method::FetchOptional => {
             quote! {
-                async fn #name<'e, E> (conn: E, params: #args) -> Result<Option<#row>, sqlx::Error>
+                async fn #name<'e, E> (executor: E, #adapter params: #args) -> Result<Option<#row>, sqlx::Error>
                 where E: sqlx::Executor<'e, Database = #db> {
-                    sqlx::query_with(#sql, params).fetch_optional(conn).await
+                    sqlx::query_with(#sql, params).fetch_optional(executor).await
                 }
             }
         },
         Method::FetchAll => {
             quote! {
-                async fn #name<'e, E> (conn: E, params: #args) -> Result<Vec<#row>, sqlx::Error>
+                async fn #name<'e, E> (executor: E, #adapter params: #args) -> Result<Vec<#row>, sqlx::Error>
                 where E: sqlx::Executor<'e, Database = #db> {
-                    sqlx::query_with(#sql, params).fetch_all(conn).await
+                    sqlx::query_with(#sql, params).fetch_all(executor).await
                 }
             }
         },
         Method::Execute => {
             quote! {
-                async fn #name<'e, E> (conn: E, params: #args) -> Result<#result, sqlx::Error>
+                async fn #name<'e, E> (executor: E, #adapter params: #args) -> Result<#result, sqlx::Error>
                 where E: sqlx::Executor<'e, Database = #db> {
-                    sqlx::query_with(#sql, params).execute(conn).await
+                    sqlx::query_with(#sql, params).execute(executor).await
                 }
             }
         },
@@ -244,66 +258,66 @@ fn generate_mapped_fn(
     Context(db, args, row, result): &Context,
     output_ts: &mut TokenStream2,
 ) {
-    let name = format_ident!("{}", q.name);
-    let sql = q.sql;
+    let (adapter, sql) = build_adapter_arg(&q);
+    let name = Ident::new(&q.name, Span::call_site());
 
     output_ts.extend(match q.method {
         Method::FetchMany => {
             quote! {
-                async fn #name<'e, E, F, T> (conn: E, params: #args, mut mapper: F) -> futures_core::stream::BoxStream<'e, Result<T, sqlx::Error>>
+                async fn #name<'e, E, M, T> (executor: E, #adapter params: #args, mut mapper: M) -> futures_core::stream::BoxStream<'e, Result<T, sqlx::Error>>
                 where E: sqlx::Executor<'e, Database = #db>,
-                      F: FnMut(#row) -> T + Send,
+                      M: FnMut(#row) -> T + Send,
                       T: Send + Unpin {
                     sqlx::query_with(#sql, params)
                         .map(mapper)
-                        .fetch(conn)
+                        .fetch(executor)
                 }
             }
         },
         Method::FetchOne => {
             quote! {
-                async fn #name<'e, E, F, T> (conn: E, params: #args, mut mapper: F) -> Result<T, sqlx::Error>
+                async fn #name<'e, E, M, T> (executor: E, #adapter params: #args, mut mapper: M) -> Result<T, sqlx::Error>
                 where E: sqlx::Executor<'e, Database = #db>,
-                      F: FnMut(#row) -> T + Send,
+                      M: FnMut(#row) -> T + Send,
                       T: Send + Unpin {
                     sqlx::query_with(#sql, params)
                         .map(mapper)
-                        .fetch_one(conn)
+                        .fetch_one(executor)
                         .await
                 }
             }
         },
         Method::FetchOptional => {
             quote! {
-                async fn #name<'e, E, F, T> (conn: E, params: #args, mut mapper: F) -> Result<Option<T>, sqlx::Error>
+                async fn #name<'e, E, M, T> (executor: E, #adapter params: #args, mut mapper: M) -> Result<Option<T>, sqlx::Error>
                 where E: sqlx::Executor<'e, Database = #db>,
-                      F: FnMut(#row) -> T + Send,
+                      M: FnMut(#row) -> T + Send,
                       T: Send + Unpin {
                     sqlx::query_with(#sql, params)
                         .map(mapper)
-                        .fetch_optional(conn)
+                        .fetch_optional(executor)
                         .await
                 }
             }
         },
         Method::FetchAll => {
             quote! {
-                async fn #name<'e, E, F, T> (conn: E, params: #args, mut mapper: F) -> Result<Vec<T>, sqlx::Error>
+                async fn #name<'e, E, M, T> (executor: E, #adapter params: #args, mut mapper: M) -> Result<Vec<T>, sqlx::Error>
                 where E: sqlx::Executor<'e, Database = #db>,
-                      F: FnMut(#row) -> T + Send,
+                      M: FnMut(#row) -> T + Send,
                       T: Send + Unpin {
                     sqlx::query_with(#sql, params)
                         .map(mapper)
-                        .fetch_all(conn)
+                        .fetch_all(executor)
                         .await
                 }
             }
         },
         Method::Execute => {
             quote! {
-                async fn #name<'e, E, F, T> (conn: E, params: #args) -> Result<#result, sqlx::Error>
+                async fn #name<'e, E, T> (executor: E, #adapter params: #args) -> Result<#result, sqlx::Error>
                 where E: sqlx::Executor<'e, Database = #db> {
-                    sqlx::query_with(#sql, params).execute(conn).await
+                    sqlx::query_with(#sql, params).execute(executor).await
                 }
             }
         },

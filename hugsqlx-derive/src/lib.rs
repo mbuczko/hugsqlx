@@ -13,5 +13,6 @@ pub fn hugsqlx(input_stream: TokenStream) -> TokenStream {
     } else {
         ContextType::Default
     });
+
     hugsqlx_core::impl_hug_sqlx(&ast, ctx).into()
 }

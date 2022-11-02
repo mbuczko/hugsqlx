@@ -110,7 +110,21 @@ HugSqlx generates a trait function `fetch_users`, which might be shaped differen
 let users = Users::fetch_users(&pool, params!["guest"], |row| { ... }).await?;
 ```
 
-Parameters need to be passed with =params!= macro due to Rust mechanism which forbids creating a vector of elements of different types.
+Parameters need to be passed with =params!= macro due to Rust "limitation" disallowing vectors with elements of different types.
+
+## Query mutation (warning - DANGER ZONE)
+If you know what you're doing, you may also mutate the query right before running. Be sure you know what [SQL injections](https://owasp.org/www-community/attacks/SQL_Injection) are and you fully control the content being injected into query.
+
+Adapter is signalled by `:adapt` hint:
+``` sql
+-- :name fetch_users :<> :* :adapt
+-- :doc Returns all the users from DB
+SELECT user_id, email, name, picture FROM users
+```
+Adaptable named query requires a closure which returns `&str` (modified query) before the actual query parameters:
+``` rust
+Users::fetch_users::<_, User>(&pool, |sql| sql.to_owned() + "\nLIMIT 2", params!()).await?;
+```
 
 ## Tips & tricks (with Emacs)
 ### How to get better syntax highlighting on comments with `:name` and `:doc`?

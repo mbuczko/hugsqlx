@@ -18,7 +18,7 @@ pub enum Method {
 
 #[derive(Debug, PartialEq, Eq)]
 enum Element {
-    Signature(String, Kind, Method),
+    Signature(String, Kind, Method, bool),
     Doc(String),
     Sql(String),
 }
@@ -28,6 +28,7 @@ pub struct Query {
     pub name: String,
     pub kind: Kind,
     pub method: Method,
+    pub adapt: bool,
     pub doc: Option<String>,
     pub sql: String,
 }
@@ -39,13 +40,15 @@ impl Query {
         let mut sql = String::default();
         let mut kind = Kind::Typed;
         let mut method = Method::FetchAll;
+        let mut adapt = false;
 
         for e in elements {
             match e {
-                Element::Signature(n, t, m) => {
+                Element::Signature(n, t, m, a) => {
                     name = n;
                     kind = t;
                     method = m;
+                    adapt = a;
                 }
                 Element::Doc(d) => doc = Some(d),
                 Element::Sql(s) => sql = s,
@@ -61,6 +64,7 @@ impl Query {
             name,
             kind,
             method,
+            adapt,
             doc,
             sql,
         }
@@ -70,7 +74,7 @@ impl Query {
 pub(crate) fn query_parser() -> impl Parser<char, Vec<Query>, Error = Simple<char>> {
     let comment = just("--").padded();
 
-    let arity = just(':')
+    let method = just(':')
         .ignore_then(choice((
             just('!').to(Method::Execute),
             just('1').to(Method::FetchOne),
@@ -79,7 +83,7 @@ pub(crate) fn query_parser() -> impl Parser<char, Vec<Query>, Error = Simple<cha
             just('^').to(Method::FetchMany),
         )))
         .padded()
-        .labelled("arity");
+        .labelled("method");
 
     let kind = just(':')
         .ignore_then(choice((
@@ -92,17 +96,22 @@ pub(crate) fn query_parser() -> impl Parser<char, Vec<Query>, Error = Simple<cha
         .padded()
         .labelled("type");
 
+    let adapt = just(':').ignore_then(just("adapt"))
+        .padded()
+        .labelled("adapt");
+
     let signature = comment
         .ignore_then(just(':'))
         .ignore_then(just("name").padded())
         .ignore_then(text::ident())
         .padded()
-        .then(kind.or_not().then(arity.or_not()))
-        .map(|(ident, (t, a))| {
+        .then(kind.or_not().then(method.or_not()).then(adapt.or_not()))
+        .map(|(ident, ((t, m), f))| {
             Element::Signature(
                 ident,
                 t.unwrap_or(Kind::Untyped),
-                a.unwrap_or(Method::Execute),
+                m.unwrap_or(Method::Execute),
+                f.is_some()
             )
         })
         .labelled("name");
