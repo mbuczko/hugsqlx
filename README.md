@@ -110,10 +110,10 @@ Assuming following query in "resources/db/queries/users.sql":
 SELECT user_id, email, name, picture FROM users WHERE role=?
 ```
 
-HugSqlx generates a trait function `fetch_users`, which might be shaped differently depending on provided query hints. Independently of hints, all the generated queries require at least 2 arguments - an `Executor` (Pool, PoolConnection or Connection) and query parameters. Mapped query, as expected, require one more parameter - a mapper function transforming DB row into a data of concrete type. Let's call the generated function for above query:
+HugSqlx generates a trait function `fetch_users`, which might be shaped differently depending on provided query hints. Independently of hints however, all the generated queries require at least 2 arguments - an `Executor` (Pool, PoolConnection or Connection) and query parameters. Mapped query, as expected, requires one more parameter - a mapper function transforming DB row into a data of concrete type. Let's call the generated function for above query:
 
 ``` rust
-let users = Users::fetch_users(&pool, params!["guest"], |row| { ... }).await?;
+let users = Users::fetch_users(&pool, params!("guest"), |row| { ... }).await?;
 ```
 
 Parameters need to be passed with =params!= macro due to Rust mechanism which forbids creating a vector of elements of different types.
