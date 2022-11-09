@@ -31,3 +31,4 @@ futures = "0.3"
 postgres = ["hugsqlx-derive/postgres", "hugsqlx-core/postgres"]
 sqlite = ["hugsqlx-derive/sqlite", "hugsqlx-core/sqlite"]
 mysql = ["hugsqlx-derive/mysql", "hugsqlx-core/mysql"]
+tracing = ["hugsqlx-derive/tracing", "hugsqlx-core/tracing"]

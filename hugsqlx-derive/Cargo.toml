@@ -23,3 +23,4 @@ quote = "1"
 postgres = ["hugsqlx-core/postgres"]
 sqlite = ["hugsqlx-core/sqlite"]
 mysql = ["hugsqlx-core/mysql"]
+tracing = ["hugsqlx-core/tracing"]

@@ -5,32 +5,49 @@ mod parser;
 use parser::{Kind, Method, Query};
 use proc_macro2::{Ident, Literal, Span, TokenStream as TokenStream2, TokenTree};
 use quote::quote;
-use std::{env, fs, path::Path};
+use std::{env, fmt, fs, path::Path};
 use syn::{parse_str, Lit, Meta, MetaNameValue, Type};
 
-pub struct Context(Type, Type, Type, Type);
-pub enum ContextType {
+#[derive(Debug)]
+pub enum ContextDb {
     Postgres,
     Sqlite,
     Mysql,
     Default,
 }
+
+impl fmt::Display for ContextDb {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ContextDb::Postgres => write!(f, "postgres"),
+            ContextDb::Sqlite => write!(f, "sqlite"),
+            ContextDb::Mysql => write!(f, "mysql"),
+            _ => write!(f, "not set"),
+        }
+    }
+}
+
+pub struct Context(ContextDb, Type, Type, Type, Type);
+
 impl Context {
-    pub fn new(context_type: ContextType) -> Self {
-        match context_type {
-            ContextType::Postgres => Context(
+    pub fn new(context_db: ContextDb) -> Self {
+        match context_db {
+            ContextDb::Postgres => Context(
+                context_db,
                 parse_str::<Type>("sqlx::postgres::Postgres").unwrap(),
                 parse_str::<Type>("sqlx::postgres::PgArguments").unwrap(),
                 parse_str::<Type>("sqlx::postgres::PgRow").unwrap(),
                 parse_str::<Type>("sqlx::postgres::PgQueryResult").unwrap(),
             ),
-            ContextType::Sqlite => Context(
+            ContextDb::Sqlite => Context(
+                context_db,
                 parse_str::<Type>("sqlx::sqlite::Sqlite").unwrap(),
                 parse_str::<Type>("sqlx::sqlite::SqliteArguments<'async_trait>").unwrap(),
                 parse_str::<Type>("sqlx::sqlite::SqliteRow").unwrap(),
                 parse_str::<Type>("sqlx::sqlite::SqliteQueryResult").unwrap(),
             ),
-            ContextType::Mysql => Context(
+            ContextDb::Mysql => Context(
+                context_db,
                 parse_str::<Type>("sqlx::mysql::Mysql").unwrap(),
                 parse_str::<Type>("sqlx::mysql::MysqlArguments").unwrap(),
                 parse_str::<Type>("sqlx::mysql::MysqlRow").unwrap(),
@@ -123,6 +140,17 @@ fn generate_impl_fns(queries: Vec<Query>, ctx: &Context, output_ts: &mut TokenSt
         if let Some(doc) = &q.doc {
             output_ts.extend(quote! { #[doc = #doc] });
         }
+        #[cfg(feature = "tracing")]
+        {
+            let db_system = ctx.0.to_string();
+            let query_name = &q.name;
+            output_ts.extend(quote! {
+                #[tracing::instrument(
+                    fields(db.system=#db_system, db.statement=#query_name),
+                    skip_all()
+                )]
+            });
+        }
         match q.kind {
             Kind::Typed => generate_typed_fn(q, ctx, output_ts),
             Kind::Untyped => generate_untyped_fn(q, ctx, output_ts),
@@ -147,7 +175,7 @@ fn build_adapter_arg(query: &Query) -> (TokenStream2, TokenStream2) {
 
 fn generate_typed_fn(
     q: Query,
-    Context(db, args, row, result): &Context,
+    Context(_, db, args, row, result): &Context,
     output_ts: &mut TokenStream2,
 ) {
     let (adapter, sql) = build_adapter_arg(&q);
@@ -203,7 +231,7 @@ fn generate_typed_fn(
 
 fn generate_untyped_fn(
     q: Query,
-    Context(db, args, row, result): &Context,
+    Context(_, db, args, row, result): &Context,
     output_ts: &mut TokenStream2,
 ) {
     let (adapter, sql) = build_adapter_arg(&q);
@@ -255,7 +283,7 @@ fn generate_untyped_fn(
 
 fn generate_mapped_fn(
     q: Query,
-    Context(db, args, row, result): &Context,
+    Context(_, db, args, row, result): &Context,
     output_ts: &mut TokenStream2,
 ) {
     let (adapter, sql) = build_adapter_arg(&q);
