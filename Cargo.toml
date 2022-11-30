@@ -1,6 +1,6 @@
 [package]
 name = "hugsqlx"
-version = "0.1.3"
+version = "0.1.4"
 description = "Turning SQL queries into Rust functions"
 repository = "https://github.com/mbuczko/hugsqlx"
 readme = "README.md"
@@ -17,7 +17,7 @@ members = ["hugsqlx-derive", "hugsqlx-core", "examples"]
 
 [dependencies]
 hugsqlx-derive = { version = "0.1.1", path = "hugsqlx-derive" }
-hugsqlx-core = { version = "0.1.3", path = "hugsqlx-core" }
+hugsqlx-core = { version = "0.1.4", path = "hugsqlx-core" }
 
 [dev-dependencies]
 async-trait = "0.1.58"
