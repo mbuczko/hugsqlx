@@ -146,8 +146,7 @@ fn generate_impl_fns(queries: Vec<Query>, ctx: &Context, output_ts: &mut TokenSt
             let query_name = &q.name;
             output_ts.extend(quote! {
                 #[tracing::instrument(
-                    name=#query_name,
-                    fields(db.system=#db_system, db.statement=#query_name),
+                    fields(otel.kind="client", db.system=#db_system, db.operation=#query_name),
                     skip_all()
                 )]
             });
