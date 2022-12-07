@@ -6,7 +6,7 @@ HugSQLx is a derive macro turning SQL queries into plain Rust functions. This is
 
 ``` toml
 [dependencies]
-hugsqlx="0.1.5"
+hugsqlx="0.1.6"
 ```
 
 ## Deep dive into named queries
@@ -80,7 +80,7 @@ Both query- and result types can be mixed:
 When using Hugsqlx, you need to decide first what database (postgres, sqlite or mysql) the code should be generated for:
 
 ``` toml
-hugsqlx = {version = "0.1.5", features = ["sqlite"]}
+hugsqlx = {version = "0.1.6", features = ["sqlite"]}
 ```
 
 Having dependency added, time to add a struct:
