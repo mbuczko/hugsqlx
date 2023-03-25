@@ -31,10 +31,10 @@ impl Context {
                 parse_str::<Type>("sqlx::sqlite::SqliteQueryResult").unwrap(),
             ),
             ContextType::Mysql => Context(
-                parse_str::<Type>("sqlx::mysql::Mysql").unwrap(),
-                parse_str::<Type>("sqlx::mysql::MysqlArguments").unwrap(),
-                parse_str::<Type>("sqlx::mysql::MysqlRow").unwrap(),
-                parse_str::<Type>("sqlx::mysql::MysqlQueryResult").unwrap(),
+                parse_str::<Type>("sqlx::mysql::MySql").unwrap(),
+                parse_str::<Type>("sqlx::mysql::MySqlArguments").unwrap(),
+                parse_str::<Type>("sqlx::mysql::MySqlRow").unwrap(),
+                parse_str::<Type>("sqlx::mysql::MySqlQueryResult").unwrap(),
             ),
             _ => panic!("None of [postgres, sqlite, mysql] feature enabled"),
         }
@@ -329,7 +329,7 @@ cfg_if::cfg_if! {
             ($($arg:expr),*) => {
                 {
                     use sqlx::Arguments;
-                    let mut args = sqlx::mysql::MysqlArguments::default();
+                    let mut args = sqlx::mysql::MySqlArguments::default();
                     $( args.add($arg); )*
                     args
                 }
