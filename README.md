@@ -22,7 +22,7 @@ The idea here is to distinguish 3 types of queries:
 - _mapped_ ones - queries where result is transformed by a mapper function rather than coerced with type given upfront. This is what SQLx does by calling `query(..).map(|f| ...)`
 
 Each of these queries (with some exception mentioned below) might return different kind and number of results:
-one result, many results, optional result or stream of results. In all cases result might be typed or it might be just a DB row. One exception to this classification a [low-level "execute" query](https://github.com/launchbadge/sqlx#querying) which is always _untyped_ and returns low-level DB-specific result (`PgQueryResult`, `SqliteQueryResult` or `MysqlQueryResult`).
+one result, many results, optional result or stream of results. In all cases result might be typed or it might be just a DB row. One exception to this classification a [low-level "execute" query](https://github.com/launchbadge/sqlx#querying) which is always _untyped_ and returns low-level DB-specific result (`PgQueryResult`, `SqliteQueryResult` or `MySqlQueryResult`).
 
 ### Query definition
 Queries are described by a simple structure:
@@ -116,7 +116,7 @@ HugSqlx generates a trait function `fetch_users`, which might be shaped differen
 let users = Users::fetch_users(&pool, params!("guest"), |row| { ... }).await?;
 ```
 
-Parameters need to be passed with =params!= macro due to Rust mechanism which forbids creating a vector of elements of different types.
+Parameters need to be passed with `params!` macro due to Rust mechanism which forbids creating a vector of elements of different types.
 
 ## Tips & tricks (with Emacs)
 ### How to get better syntax highlighting on comments with `:name` and `:doc`?
@@ -136,7 +136,7 @@ Parameters need to be passed with =params!= macro due to Rust mechanism which fo
 ```
 
 ## Limitations
-Query definition both with `:name` and `:doc` expects to have `:name` comment first. HugSqlx does not complain otherwise, but result might be surprising.
+Query definition both with `:name` and `:doc` expects `:name` comment to appear first. HugSqlx does not complain otherwise, but result might be surprising.
 
 No subfolders are recursively traversed to read query definitions.
 
