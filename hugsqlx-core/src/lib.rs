@@ -70,10 +70,13 @@ pub fn impl_hug_sqlx(ast: &syn::DeriveInput, ctx: Context) -> TokenStream2 {
         .unwrap_or_else(|err| panic!("folder path must resolve to an absolute path: {}", err));
 
     let cargo_dir = env::var("CARGO_MANIFEST_DIR").expect("Could not locate Cargo.toml");
-    if !canonical_path.starts_with(&cargo_dir) {
+    let cargo_dir_canonical_path = Path::new(&cargo_dir)
+        .canonicalize()
+        .unwrap_or_else(|err| panic!("cargo dir path must resolve to an absolute path: {}", err));
+    if !canonical_path.starts_with(&cargo_dir_canonical_path) {
         panic!(
             "Queries path must be relative to Cargo.toml location ({})",
-            cargo_dir
+            cargo_dir_canonical_path.display(),
         );
     }
 
