@@ -5,7 +5,11 @@ mod parser;
 use parser::{Kind, Method, Query};
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
-use std::{env, fs, path::Path};
+use std::{
+    collections::BTreeSet,
+    env, fs,
+    path::{Path, PathBuf},
+};
 use syn::{parse_str, Lit, Meta, MetaNameValue, Type};
 
 pub struct Context(Type, Type, Type, Type);
@@ -56,6 +60,53 @@ fn find_attribute_values(ast: &syn::DeriveInput, attr_name: &str) -> Vec<String>
         .collect()
 }
 
+fn workspace_dir() -> PathBuf {
+    let output = std::process::Command::new(env!("CARGO"))
+        .arg("locate-project")
+        .arg("--workspace")
+        .arg("--message-format=plain")
+        .output()
+        .unwrap()
+        .stdout;
+    let cargo_path = Path::new(std::str::from_utf8(&output).unwrap().trim());
+    cargo_path
+        .parent()
+        .unwrap()
+        .to_path_buf()
+        .canonicalize()
+        .unwrap_or_else(|err| {
+            panic!(
+                "workspace dir path must resolve to an absolute path: {}",
+                err
+            )
+        })
+}
+
+/// Find a suitable candidate queries path by both the local crate's CARGO_MANIFEST_DIR
+/// as well as the workspace root.
+pub fn find_queries_path(queries_path: String) -> PathBuf {
+    // The directory of the crate's cargo dir. This may be different from the workspace root's directory.
+    let cargo_dir = env::var("CARGO_MANIFEST_DIR").expect("Could not locate Cargo.toml");
+    let cargo_dir_canonical_path = Path::new(&cargo_dir)
+        .canonicalize()
+        .unwrap_or_else(|err| panic!("cargo dir path must resolve to an absolute path: {}", err));
+
+    let workspace_root = workspace_dir();
+    let candidates = [cargo_dir_canonical_path, workspace_root];
+    let mut seen = BTreeSet::new();
+    for c in candidates.iter() {
+        if seen.contains(c) {
+            continue;
+        }
+        let result = c.join(&queries_path);
+        if result.exists() {
+            return result;
+        }
+        seen.insert(c.clone());
+    }
+    panic!("Queries path must be relative to the crate's Cargo.toml location or the workspace root. Tried the following folders: {seen:?}");
+}
+
 pub fn impl_hug_sqlx(ast: &syn::DeriveInput, ctx: Context) -> TokenStream2 {
     let mut queries_paths = find_attribute_values(ast, "queries");
     if queries_paths.len() != 1 {
@@ -63,22 +114,7 @@ pub fn impl_hug_sqlx(ast: &syn::DeriveInput, ctx: Context) -> TokenStream2 {
             "#[derive(HugSql)] must contain one attribute like this #[queries = \"db/queries/\"]"
         );
     }
-
-    let folder_path = queries_paths.remove(0);
-    let canonical_path = Path::new(&folder_path)
-        .canonicalize()
-        .unwrap_or_else(|err| panic!("folder path must resolve to an absolute path: {}", err));
-
-    let cargo_dir = env::var("CARGO_MANIFEST_DIR").expect("Could not locate Cargo.toml");
-    let cargo_dir_canonical_path = Path::new(&cargo_dir)
-        .canonicalize()
-        .unwrap_or_else(|err| panic!("cargo dir path must resolve to an absolute path: {}", err));
-    if !canonical_path.starts_with(&cargo_dir_canonical_path) {
-        panic!(
-            "Queries path must be relative to Cargo.toml location ({})",
-            cargo_dir_canonical_path.display(),
-        );
-    }
+    let canonical_path = find_queries_path(queries_paths.remove(0));
 
     let files = if canonical_path.is_dir() {
         walkdir::WalkDir::new(canonical_path)
