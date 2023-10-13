@@ -91,19 +91,18 @@ pub fn find_queries_path(queries_path: String) -> PathBuf {
         .canonicalize()
         .unwrap_or_else(|err| panic!("cargo dir path must resolve to an absolute path: {}", err));
 
-    let workspace_root = workspace_dir();
-    let candidates = [cargo_dir_canonical_path, workspace_root];
     let mut seen = BTreeSet::new();
-    for c in candidates.iter() {
-        if seen.contains(c) {
-            continue;
-        }
-        let result = c.join(&queries_path);
-        if result.exists() {
-            return result;
-        }
-        seen.insert(c.clone());
+    let candidate_path = cargo_dir_canonical_path.join(&queries_path);
+    if candidate_path.exists() {
+        return candidate_path;
     }
+    seen.insert(cargo_dir_canonical_path);
+    let workspace_root = workspace_dir();
+    let candidate_path = workspace_root.join(&queries_path);
+    if candidate_path.exists() {
+        return candidate_path;
+    }
+    seen.insert(workspace_root);
     panic!("Queries path must be relative to the crate's Cargo.toml location or the workspace root. Tried the following folders: {seen:?}");
 }
 
