@@ -99,7 +99,7 @@ use hugsqlx::{params, HugSqlx};
 struct Users {}
 ```
 
-`queries` attribute needs to be a project (Cargo.toml) relative path and may point to either a single file (query definitions will be taken from this file only) or a directory. The later forces macro to traverse a path and generate corresponding functions upon found files.
+`queries` attribute needs to be either `CARGO_MANIFEST_DIR` (crate's Cargo.toml directory) or workspace relative path and may point to either a single file (query definitions will be taken from this file only) or a directory. The later forces macro to traverse a path and generate corresponding functions upon found files.
 
 Example:
 
