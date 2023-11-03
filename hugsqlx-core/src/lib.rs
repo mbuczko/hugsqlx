@@ -30,7 +30,7 @@ impl Context {
             ),
             ContextType::Sqlite => Context(
                 parse_str::<Type>("sqlx::sqlite::Sqlite").unwrap(),
-                parse_str::<Type>("sqlx::sqlite::SqliteArguments<'async_trait>").unwrap(),
+                parse_str::<Type>("sqlx::sqlite::SqliteArguments<'_>").unwrap(),
                 parse_str::<Type>("sqlx::sqlite::SqliteRow").unwrap(),
                 parse_str::<Type>("sqlx::sqlite::SqliteQueryResult").unwrap(),
             ),
@@ -146,7 +146,6 @@ pub fn impl_hug_sqlx(ast: &syn::DeriveInput, ctx: Context) -> TokenStream2 {
     }
 
     output_ts.extend(quote! {
-        #[async_trait::async_trait]
         pub trait HugSql<'q> {
             #functions
         }
