@@ -1,6 +1,6 @@
 [package]
 name = "hugsqlx"
-version = "0.2.0"
+version = "0.2.1"
 description = "Turning SQL queries into Rust functions"
 repository = "https://github.com/mbuczko/hugsqlx"
 readme = "README.md"
