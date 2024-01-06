@@ -23,7 +23,7 @@ struct Profile {
 }
 
 #[derive(HugSqlx)]
-#[queries = "examples/resources/queries.sql"]
+#[queries = "resources/queries.sql"]
 struct Users {}
 
 fn generate_email(name: &str) -> String {
