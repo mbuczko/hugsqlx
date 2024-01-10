@@ -1,0 +1,13 @@
+[package]
+name = "postgres-example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hugsqlx = { path = "../../", features = [ "postgres"] }
+sqlx = { version = "0.7.2", features = ["postgres", "runtime-tokio-rustls"] }
+tokio = { version = "1", features = ["full"]}
+uuid = { version = "1.2.1", features = ["v4"] }
+anyhow = "1.0"
+futures = "0.3"
+futures-core = "0.3"
