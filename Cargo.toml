@@ -1,6 +1,6 @@
 [package]
 name = "hugsqlx"
-version = "0.2.1"
+version = "0.3.0"
 description = "Turning SQL queries into Rust functions"
 repository = "https://github.com/mbuczko/hugsqlx"
 readme = "README.md"
@@ -16,8 +16,8 @@ edition = "2021"
 members = ["hugsqlx-derive", "hugsqlx-core", "examples/*"]
 
 [dependencies]
-hugsqlx-derive = { version = "0.2.0", path = "hugsqlx-derive" }
-hugsqlx-core = { version = "0.2.0", path = "hugsqlx-core" }
+hugsqlx-derive = { version = "0.3.0", path = "hugsqlx-derive" }
+hugsqlx-core = { version = "0.3.0", path = "hugsqlx-core" }
 
 [features]
 postgres = ["hugsqlx-derive/postgres", "hugsqlx-core/postgres"]

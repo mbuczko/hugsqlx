@@ -1,5 +1,5 @@
 [package]
-version = "0.2.0"
+version = "0.3.0"
 name = "hugsqlx-derive"
 description = "Turning SQL queries into Rust functions"
 repository = "https://github.com/mbuczko/hugsqlx"
@@ -14,7 +14,7 @@ edition = "2021"
 proc-macro = true
 
 [dependencies]
-hugsqlx-core = { version = "0.2.0", path = "../hugsqlx-core" }
+hugsqlx-core = { version = "0.3.0", path = "../hugsqlx-core" }
 syn = {version = "1", default-features = false, features = ["derive", "parsing", "proc-macro"]}
 proc-macro2 = "1"
 quote = "1"

@@ -9,7 +9,7 @@ HugSQLx stands on a shoulders of [SQLx](https://crates.io/crates/sqlx):
 ``` toml
 [dependencies]
 sqlx = { version = "0.6.2", features = ["sqlite"] }
-hugsqlx = { version = "0.2.0", features = ["sqlite"] }
+hugsqlx = { version = "0.3.0", features = ["sqlite"] }
 ```
 
 Both HugSQLx and SQLx itself should have the same database mentioned in *features* (sqlite, postgres or mysql).
@@ -85,7 +85,7 @@ Both query- and result types can be mixed:
 When using Hugsqlx, you need to decide first what database (postgres, sqlite or mysql) the code should be generated for:
 
 ``` toml
-hugsqlx = {version = "0.2.0", features = ["sqlite"]}
+hugsqlx = {version = "0.3.0", features = ["sqlite"]}
 ```
 
 Having dependency added, time to add a struct:
