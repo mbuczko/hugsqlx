@@ -117,6 +117,41 @@ let users = Users::fetch_users(&pool, params!("guest"), |row| { ... }).await?;
 
 Parameters need to be passed with `params!` macro due to Rust mechanism which forbids creating a vector of elements of different types.
 
+## Conditional SQL blocks
+Sometimes query should include or exclude certain part of SQL depending on external condition. As an example imagine a request coming with 2 parameters: `tags_included` and `tags_excluded` - both can be empty. Now, a query returning tags could look like following:
+
+``` sql
+SELECT name FROM tags
+WHERE 1=1
+-- if non-empty tags_included add "AND name IN (...)"
+-- if non-empty tags_excluded add "AND name NOT IN (...)"
+```
+
+How to add this kind of dynamically deduced part of the query? HugSqlx introduces conditional blocks:
+
+``` sql
+-- :name return_tags :*
+-- :doc Returns tags excluding or including provided ones.
+SELECT name FROM tags
+WHERE 1=1
+--~{ tags_included
+AND name IN (...)
+--~}
+--~{ tags_excluded
+AND name NOT IN (...)
+--~}
+```
+
+When an opening comment is detected, HugSqlx extends resulting function signature adding as a second parameter a function accepting one argument of a type being an Enum composed of query name and condition identifier found in a comment. For above example following enum gets generated:
+
+``` rust
+enum ReturnTags {
+  TagsIncluded,
+  TagsExcluded,
+}
+```
+For each conditional block a function called with corresponding enum variant is expected to return a `bool` - either true if block should be included or false otherwise.
+
 ## Tips & tricks (with Emacs)
 ### How to get better syntax highlighting on comments with `:name` and `:doc`?
 
