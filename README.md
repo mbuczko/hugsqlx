@@ -142,7 +142,7 @@ AND name NOT IN (...)
 --~}
 ```
 
-When an opening comment is detected, HugSqlx extends resulting function signature adding as a second parameter a function accepting one argument of a type being an Enum composed of query name and condition identifier found in a comment. For above example following enum gets generated:
+When an opening comment is detected, HugSqlx extends resulting function signature by an additional (second) parameter - an `FnOnce` accepting single argument of an Enum type generated from query name, with condition identifiers as enumeration variants. And so, for above example following enum gets generated:
 
 ``` rust
 enum ReturnTags {
