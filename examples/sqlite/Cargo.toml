@@ -1,0 +1,18 @@
+[package]
+name = "sqlite"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "sqlite-example"
+path = "src/main.rs"
+
+[dependencies]
+common = { path = "../common" }
+hugsqlx = { path = "../..", features = ["sqlite"] }
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+futures = "0.3"
+futures-core = "0.3"

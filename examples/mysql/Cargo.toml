@@ -1,0 +1,18 @@
+[package]
+name = "mysql"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "mysql-example"
+path = "src/main.rs"
+
+[dependencies]
+common = { path = "../common" }
+hugsqlx = { path = "../..", features = ["mysql"] }
+sqlx = { version = "0.8", features = ["mysql", "runtime-tokio"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+futures = "0.3"
+futures-core = "0.3"

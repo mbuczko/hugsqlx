@@ -1,0 +1,18 @@
+[package]
+name = "postgres"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "postgres-example"
+path = "src/main.rs"
+
+[dependencies]
+common = { path = "../common" }
+hugsqlx = { path = "../..", features = ["postgres"] }
+sqlx = { version = "0.8", features = ["postgres", "runtime-tokio"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+futures = "0.3"
+futures-core = "0.3"
