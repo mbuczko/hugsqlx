@@ -1,5 +1,7 @@
 use chumsky::prelude::*;
 
+use crate::condblock::{self, SqlBlock};
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
     Typed,
@@ -20,7 +22,7 @@ pub enum Method {
 enum Element {
     Signature(String, Kind, Method),
     Doc(String),
-    Sql(String),
+    Sql(Vec<SqlBlock>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -29,14 +31,14 @@ pub struct Query {
     pub kind: Kind,
     pub method: Method,
     pub doc: Option<String>,
-    pub sql: String,
+    pub sql: Vec<SqlBlock>,
 }
 
 impl Query {
     fn from(elements: Vec<Element>) -> Self {
         let mut name = String::default();
         let mut doc = None;
-        let mut sql = String::default();
+        let mut sql = None;
         let mut kind = Kind::Typed;
         let mut method = Method::FetchAll;
 
@@ -48,13 +50,16 @@ impl Query {
                     method = m;
                 }
                 Element::Doc(d) => doc = Some(d),
-                Element::Sql(s) => sql = s,
+                Element::Sql(s) => sql = Some(s),
             }
         }
+
+        let sql = sql.expect("SQL block is required for a query");
+
         if name.is_empty() {
             panic!(
-                ":name attribute is missing or is not a valid identifier. Query: \"{}\"",
-                sql.trim()
+                ":name attribute is missing or is not a valid identifier. Query: \"{:?}\"",
+                sql
             );
         }
         Query {
@@ -69,7 +74,6 @@ impl Query {
 
 pub(crate) fn query_parser() -> impl Parser<char, Vec<Query>, Error = Simple<char>> {
     let comment = just("--").padded();
-
     let arity = just(':')
         .ignore_then(choice((
             just('!').to(Method::Execute),
@@ -128,7 +132,10 @@ pub(crate) fn query_parser() -> impl Parser<char, Vec<Query>, Error = Simple<cha
     let signature_cloned = signature.clone();
     let sql = take_until(signature_cloned.or(doc).rewind().ignored().or(end()))
         .padded()
-        .map(|(v, _)| Element::Sql(v.iter().collect::<String>()))
+        .map(|(v, _)| {
+            let blocks = condblock::parse_sql_blocks(&v);
+            Element::Sql(blocks)
+        })
         .labelled("sql");
 
     let query = signature

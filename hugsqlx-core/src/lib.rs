@@ -1,10 +1,11 @@
 extern crate proc_macro;
 
+mod condblock;
 mod parser;
 
 use parser::{Kind, Method, Query};
-use proc_macro2::TokenStream as TokenStream2;
-use quote::{format_ident, quote};
+use proc_macro2::{Ident, Span, TokenStream as TokenStream2};
+use quote::quote;
 use std::{
     collections::BTreeSet,
     env, fs,
@@ -82,6 +83,23 @@ fn workspace_dir() -> PathBuf {
         })
 }
 
+fn snake_to_pascal(snake: &str) -> String {
+    let mut result = String::with_capacity(snake.len());
+    let mut capitalize_next = true;
+
+    for ch in snake.chars() {
+        if ch == '_' {
+            capitalize_next = true;
+        } else if capitalize_next {
+            result.extend(ch.to_uppercase());
+            capitalize_next = false;
+        } else {
+            result.push(ch);
+        }
+    }
+    result
+}
+
 /// Find a suitable candidate queries path by both the local crate's CARGO_MANIFEST_DIR
 /// as well as the workspace root.
 pub fn find_queries_path(queries_path: String) -> PathBuf {
@@ -97,11 +115,14 @@ pub fn find_queries_path(queries_path: String) -> PathBuf {
         return candidate_path;
     }
     seen.insert(cargo_dir_canonical_path);
+
     let workspace_root = workspace_dir();
     let candidate_path = workspace_root.join(&queries_path);
+
     if candidate_path.exists() {
         return candidate_path;
     }
+
     seen.insert(workspace_root);
     panic!("Queries path must be relative to the crate's Cargo.toml location or the workspace root. Tried the following folders: {seen:?}");
 }
@@ -131,12 +152,13 @@ pub fn impl_hug_sqlx(ast: &syn::DeriveInput, ctx: Context) -> TokenStream2 {
     let name = &ast.ident;
     let mut output_ts = TokenStream2::new();
     let mut functions = TokenStream2::new();
+    let mut enums = TokenStream2::new();
 
     for f in files {
         if let Ok(input) = fs::read_to_string(f) {
             match parser::parse_queries(input) {
                 Ok(ast) => {
-                    generate_impl_fns(ast, &ctx, &mut functions);
+                    generate_impl_fns(ast, &ctx, &mut functions, &mut enums);
                 }
                 Err(parse_errs) => parse_errs
                     .into_iter()
@@ -146,6 +168,8 @@ pub fn impl_hug_sqlx(ast: &syn::DeriveInput, ctx: Context) -> TokenStream2 {
     }
 
     output_ts.extend(quote! {
+        #enums
+
         pub trait HugSql {
             #functions
         }
@@ -155,15 +179,85 @@ pub fn impl_hug_sqlx(ast: &syn::DeriveInput, ctx: Context) -> TokenStream2 {
     output_ts
 }
 
-fn generate_impl_fns(queries: Vec<Query>, ctx: &Context, output_ts: &mut TokenStream2) {
+fn generate_cond_block_resolver_fn(query: &Query) -> (TokenStream2, TokenStream2, TokenStream2) {
+    let sql_blocks = &query.sql;
+    let cond_blocks = sql_blocks
+        .iter()
+        .filter(|b| matches!(b, condblock::SqlBlock::Conditional(_, _)))
+        .count();
+
+    if cond_blocks > 0 {
+        let enumeration = Ident::new(&snake_to_pascal(&query.name), Span::call_site());
+        let mut variants = Vec::with_capacity(cond_blocks);
+
+        // Generate compile-time code that builds the SQL string at runtime
+        let block_processing: Vec<_> = sql_blocks
+            .iter()
+            .map(|block| match block {
+                condblock::SqlBlock::Conditional(id, sql) => {
+                    let variant = Ident::new(&snake_to_pascal(id), Span::call_site());
+                    let quot = quote! {
+                        if block_resolver(#enumeration::#variant) {
+                            result.push('\n');
+                            result.push_str(#sql);
+                        }
+                    };
+                    variants.push(variant);
+                    quot
+                }
+                condblock::SqlBlock::Literal(sql) => {
+                    quote! {
+                        result.push_str(#sql);
+                    }
+                }
+            })
+            .collect();
+
+        // Generate Enums that will be passed to block resolving function
+        let variant_tokens = variants.into_iter().map(|variant| {
+            quote! {
+                #variant,
+            }
+        });
+
+        return (
+            quote! { block_resolver: impl Fn(#enumeration) -> bool + Send, },
+            quote! {
+                &{
+                    let mut result = String::new();
+                    #(#block_processing)*
+                    result
+                }
+            },
+            quote! {
+                pub enum #enumeration {
+                    #(#variant_tokens)*
+                }
+            },
+        );
+    }
+    let sql = match sql_blocks.first() {
+        Some(condblock::SqlBlock::Literal(sql))
+        | Some(condblock::SqlBlock::Conditional(_, sql)) => sql,
+        None => "",
+    };
+    (TokenStream2::new(), quote! { #sql }, TokenStream2::new())
+}
+
+fn generate_impl_fns(
+    queries: Vec<Query>,
+    ctx: &Context,
+    functions_ts: &mut TokenStream2,
+    enums_ts: &mut TokenStream2,
+) {
     for q in queries {
         if let Some(doc) = &q.doc {
-            output_ts.extend(quote! { #[doc = #doc] });
+            functions_ts.extend(quote! { #[doc = #doc] });
         }
         match q.kind {
-            Kind::Typed => generate_typed_fn(q, ctx, output_ts),
-            Kind::Untyped => generate_untyped_fn(q, ctx, output_ts),
-            Kind::Mapped => generate_mapped_fn(q, ctx, output_ts),
+            Kind::Typed => generate_typed_fn(q, ctx, functions_ts, enums_ts),
+            Kind::Untyped => generate_untyped_fn(q, ctx, functions_ts, enums_ts),
+            Kind::Mapped => generate_mapped_fn(q, ctx, functions_ts, enums_ts),
         }
     }
 }
@@ -171,68 +265,71 @@ fn generate_impl_fns(queries: Vec<Query>, ctx: &Context, output_ts: &mut TokenSt
 fn generate_typed_fn(
     q: Query,
     Context(db, args, row, result): &Context,
-    output_ts: &mut TokenStream2,
+    functions_ts: &mut TokenStream2,
+    enums_ts: &mut TokenStream2,
 ) {
-    let name = format_ident!("{}", q.name);
-    let sql = q.sql;
+    let name = Ident::new(&q.name, Span::call_site());
+    let (block_resolver, sql, enums) = generate_cond_block_resolver_fn(&q);
 
-    output_ts.extend(match q.method {
+    enums_ts.extend(enums);
+
+    functions_ts.extend(match q.method {
         Method::FetchMany => {
             quote! {
-                async fn #name<'q, 'e, 'c, E, T> (conn: E, params: #args) -> futures_core::stream::BoxStream<'e, Result<T, sqlx::Error>>
+                async fn #name<'q, 'e, 'c, E, T> (executor: E, #block_resolver params: #args) -> futures_core::stream::BoxStream<'e, Result<T, sqlx::Error>>
                 where
                       'q: 'e,
                       'c: 'e,
                       E: sqlx::Executor<'c, Database = #db> + 'e,
                       T: Send + Unpin + for<'r> sqlx::FromRow<'r, #row> + 'e {
-                    sqlx::query_as_with(#sql, params).fetch(conn)
+                    sqlx::query_as_with(#sql, params).fetch(executor)
                 }
             }
         },
         Method::FetchOne => {
             quote! {
-                async fn #name<'q, 'e, 'c, E, T> (conn: E, params: #args) -> Result<T, sqlx::Error>
-                where 
+                async fn #name<'q, 'e, 'c, E, T> (executor: E, #block_resolver params: #args) -> Result<T, sqlx::Error>
+                where
                       'q: 'e,
                       'c: 'e,
                       E: sqlx::Executor<'c, Database = #db> + 'e,
                       T: Send + Unpin + for<'r> sqlx::FromRow<'r, #row> + 'e {
-                    sqlx::query_as_with(#sql, params).fetch_one(conn).await
+                    sqlx::query_as_with(#sql, params).fetch_one(executor).await
                 }
             }
         },
         Method::FetchOptional => {
             quote! {
-                async fn #name<'q, 'e, 'c, E, T> (conn: E, params: #args) -> Result<Option<T>, sqlx::Error>
+                async fn #name<'q, 'e, 'c, E, T> (executor: E, #block_resolver params: #args) -> Result<Option<T>, sqlx::Error>
                 where
                       'q: 'e,
                       'c: 'e,
                       E: sqlx::Executor<'c, Database = #db> + 'e,
                       T: Send + Unpin + for<'r> sqlx::FromRow<'r, #row> + 'e {
-                    sqlx::query_as_with(#sql, params).fetch_optional(conn).await
+                    sqlx::query_as_with(#sql, params).fetch_optional(executor).await
                 }
             }
         },
         Method::FetchAll => {
             quote! {
-                async fn #name<'q, 'e, 'c, E, T> (conn: E, params: #args) -> Result<Vec<T>, sqlx::Error>
+                async fn #name<'q, 'e, 'c, E, T> (executor: E, #block_resolver params: #args) -> Result<Vec<T>, sqlx::Error>
                 where
                      'q: 'e,
                      'c: 'e,
                       E: sqlx::Executor<'c, Database = #db> + 'e,
                       T: Send + Unpin + for<'r> sqlx::FromRow<'r, #row> + 'e {
-                    sqlx::query_as_with(#sql, params).fetch_all(conn).await
+                    sqlx::query_as_with(#sql, params).fetch_all(executor).await
                 }
             }
         },
         Method::Execute => {
             quote! {
-                async fn #name<'q, 'e, 'c, E> (conn: E, params: #args) -> Result<#result, sqlx::Error>
+                async fn #name<'q, 'e, 'c, E> (executor: E, #block_resolver params: #args) -> Result<#result, sqlx::Error>
                 where
                  'q: 'e,
                  'c: 'e,
                  E: sqlx::Executor<'c, Database = #db> + 'e {
-                    sqlx::query_with(#sql, params).execute(conn).await
+                    sqlx::query_with(#sql, params).execute(executor).await
                 }
             }
         },
@@ -242,64 +339,67 @@ fn generate_typed_fn(
 fn generate_untyped_fn(
     q: Query,
     Context(db, args, row, result): &Context,
-    output_ts: &mut TokenStream2,
+    functions_ts: &mut TokenStream2,
+    enums_ts: &mut TokenStream2,
 ) {
-    let name = format_ident!("{}", q.name);
-    let sql = q.sql;
+    let name = Ident::new(&q.name, Span::call_site());
+    let (block_resolver, sql, enums) = generate_cond_block_resolver_fn(&q);
 
-    output_ts.extend(match q.method {
+    enums_ts.extend(enums);
+
+    functions_ts.extend(match q.method {
         Method::FetchMany => {
             quote! {
-                async fn #name<'q, 'e, 'c, E> (conn: E, params: #args) -> futures_core::stream::BoxStream<'e, Result<#row, sqlx::Error>>
+                async fn #name<'q, 'e, 'c, E> (executor: E, #block_resolver params: #args) -> futures_core::stream::BoxStream<'e, Result<#row, sqlx::Error>>
                 where
                  'q: 'e,
                  'c: 'e,
                  E: sqlx::Executor<'c, Database = #db> + 'e {
-                    sqlx::query_with(#sql, params).fetch(conn)
+                    sqlx::query_with(#sql, params).fetch(executor)
                 }
             }
         },
         Method::FetchOne => {
             quote! {
-                async fn #name<'q, 'e, 'c, E> (conn: E, params: #args) -> Result<#row, sqlx::Error>
+                async fn #name<'q, 'e, 'c, E> (executor: E, #block_resolver params: #args) -> Result<#row, sqlx::Error>
                 where
                  'q: 'e,
                  'c: 'e,
                  E: sqlx::Executor<'c, Database = #db> + 'e {
-                    sqlx::query_with(#sql, params).fetch_one(conn).await
+                    sqlx::query_with(#sql, params).fetch_one(executor).await
                 }
             }
         },
         Method::FetchOptional => {
             quote! {
-                async fn #name<'q, 'e, 'c, E> (conn: E, params: #args) -> Result<Option<#row>, sqlx::Error>
+                async fn #name<'q, 'e, 'c, E> (executor: E, #block_resolver params: #args) -> Result<Option<#row>, sqlx::Error>
                 where
                  'q: 'e,
                  'c: 'e,
                  E: sqlx::Executor<'c, Database = #db> + 'e {
-                    sqlx::query_with(#sql, params).fetch_optional(conn).await
+                    sqlx::query_with(#sql, params).fetch_optional(executor).await
                 }
             }
         },
         Method::FetchAll => {
             quote! {
-                async fn #name<'q, 'e, 'c, E> (conn: E, params: #args) -> Result<Vec<#row>, sqlx::Error>
+                async fn #name<'q, 'e, 'c, E> (executor: E, #block_resolver params: #args) -> Result<Vec<#row>, sqlx::Error>
                 where
                  'q: 'e,
                  'c: 'e,
                  E: sqlx::Executor<'c, Database = #db> + 'e {
-                    sqlx::query_with(#sql, params).fetch_all(conn).await
+                    sqlx::query_with(#sql, params).fetch_all(executor).await
                 }
             }
         },
         Method::Execute => {
             quote! {
-                async fn #name<'q, 'e, 'c, E> (conn: E, params: #args) -> Result<#result, sqlx::Error>
+                async fn #name<'q, 'e, 'c, E> (executor: E, #block_resolver params: #args) -> Result<#result, sqlx::Error>
                 where
                  'q: 'e,
                  'c: 'e,
                  E: sqlx::Executor<'c, Database = #db> + 'e {
-                    sqlx::query_with(#sql, params).execute(conn).await
+                    sqlx::query_with(#sql, params).execute(executor).await
                 }
             }
         },
@@ -309,16 +409,19 @@ fn generate_untyped_fn(
 fn generate_mapped_fn(
     q: Query,
     Context(db, args, row, result): &Context,
-    output_ts: &mut TokenStream2,
+    functions_ts: &mut TokenStream2,
+    enums_ts: &mut TokenStream2,
 ) {
-    let name = format_ident!("{}", q.name);
-    let sql = q.sql;
+    let name = Ident::new(&q.name, Span::call_site());
+    let (block_resolver, sql, enums) = generate_cond_block_resolver_fn(&q);
 
-    output_ts.extend(match q.method {
+    enums_ts.extend(enums);
+
+    functions_ts.extend(match q.method {
         Method::FetchMany => {
             quote! {
-                async fn #name<'q, 'e, 'c, E, F, T> (conn: E, params: #args, mapper: F) -> futures_core::stream::BoxStream<'e, Result<T, sqlx::Error>>
-                where 
+                async fn #name<'q, 'e, 'c, E, F, T> (executor: E, #block_resolver params: #args, mapper: F) -> futures_core::stream::BoxStream<'e, Result<T, sqlx::Error>>
+                where
                       'q: 'e,
                       'c: 'e,
                       E: sqlx::Executor<'c, Database = #db> + 'e,
@@ -326,14 +429,14 @@ fn generate_mapped_fn(
                       T: Send + Unpin + 'e {
                     sqlx::query_with(#sql, params)
                         .map(mapper)
-                        .fetch(conn)
+                        .fetch(executor)
                 }
             }
         },
         Method::FetchOne => {
             quote! {
-                async fn #name<'q, 'e, 'c, E, F, T> (conn: E, params: #args, mapper: F) -> Result<T, sqlx::Error>
-                where 
+                async fn #name<'q, 'e, 'c, E, F, T> (executor: E, #block_resolver params: #args, mapper: F) -> Result<T, sqlx::Error>
+                where
                       'q: 'e,
                       'c: 'e,
                       E: sqlx::Executor<'c, Database = #db> + 'e,
@@ -341,15 +444,15 @@ fn generate_mapped_fn(
                       T: Send + Unpin + 'e {
                     sqlx::query_with(#sql, params)
                         .map(mapper)
-                        .fetch_one(conn)
+                        .fetch_one(executor)
                         .await
                 }
             }
         },
         Method::FetchOptional => {
             quote! {
-                async fn #name<'q, 'e, 'c, E, F, T> (conn: E, params: #args, mapper: F) -> Result<Option<T>, sqlx::Error>
-                where 
+                async fn #name<'q, 'e, 'c, E, F, T> (executor: E, #block_resolver params: #args, mapper: F) -> Result<Option<T>, sqlx::Error>
+                where
                       'q: 'e,
                       'c: 'e,
                       E: sqlx::Executor<'c, Database = #db> + 'e,
@@ -357,15 +460,15 @@ fn generate_mapped_fn(
                       T: Send + Unpin + 'e {
                     sqlx::query_with(#sql, params)
                         .map(mapper)
-                        .fetch_optional(conn)
+                        .fetch_optional(executor)
                         .await
                 }
             }
         },
         Method::FetchAll => {
             quote! {
-                async fn #name<'q, 'e, 'c, E, F, T> (conn: E, params: #args, mapper: F) -> Result<Vec<T>, sqlx::Error>
-                where 
+                async fn #name<'q, 'e, 'c, E, F, T> (executor: E, #block_resolver params: #args, mapper: F) -> Result<Vec<T>, sqlx::Error>
+                where
                       'q: 'e,
                       'c: 'e,
                       E: sqlx::Executor<'c, Database = #db> + 'e,
@@ -373,19 +476,19 @@ fn generate_mapped_fn(
                       T: Send + Unpin + 'e {
                     sqlx::query_with(#sql, params)
                         .map(mapper)
-                        .fetch_all(conn)
+                        .fetch_all(executor)
                         .await
                 }
             }
         },
         Method::Execute => {
             quote! {
-                async fn #name<'q, 'e, 'c, E, F, T> (conn: E, params: #args) -> Result<#result, sqlx::Error>
-                where 
+                async fn #name<'q, 'e, 'c, E, F, T> (executor: E, #block_resolver params: #args) -> Result<#result, sqlx::Error>
+                where
                       'q: 'e,
                       'c: 'e,
                       E: sqlx::Executor<'c, Database = #db> + 'e {
-                    sqlx::query_with(#sql, params).execute(conn).await
+                    sqlx::query_with(#sql, params).execute(executor).await
                 }
             }
         },
@@ -400,7 +503,7 @@ cfg_if::cfg_if! {
                 {
                     use sqlx::Arguments;
                     let mut args = sqlx::postgres::PgArguments::default();
-                    $( args.add($arg); )*
+                    $( args.add($arg).unwrap(); )*
                     args
                 }
             };
@@ -412,7 +515,7 @@ cfg_if::cfg_if! {
                 {
                     use sqlx::Arguments;
                     let mut args = sqlx::mysql::MySqlArguments::default();
-                    $( args.add($arg); )*
+                    $( args.add($arg).unwrap(); )*
                     args
                 }
             };
@@ -424,7 +527,7 @@ cfg_if::cfg_if! {
                 {
                     use sqlx::Arguments;
                     let mut args = sqlx::sqlite::SqliteArguments::default();
-                    $( args.add($arg); )*
+                    $( args.add($arg).unwrap(); )*
                     args
                 }
             };
