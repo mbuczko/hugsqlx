@@ -198,8 +198,8 @@ fn generate_cond_block_resolver_fn(query: &Query) -> (TokenStream2, TokenStream2
                     let variant = Ident::new(&snake_to_pascal(id), Span::call_site());
                     let quot = quote! {
                         if block_resolver(#enumeration::#variant) {
-                            result.push('\n');
                             result.push_str(#sql);
+                            result.push('\n');
                         }
                     };
                     variants.push(variant);
@@ -208,6 +208,7 @@ fn generate_cond_block_resolver_fn(query: &Query) -> (TokenStream2, TokenStream2
                 condblock::SqlBlock::Literal(sql) => {
                     quote! {
                         result.push_str(#sql);
+                        result.push('\n');
                     }
                 }
             })

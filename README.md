@@ -8,8 +8,8 @@ HugSQLx stands on a shoulders of [SQLx](https://crates.io/crates/sqlx):
 
 ``` toml
 [dependencies]
-sqlx = { version = "0.6.2", features = ["sqlite"] }
-hugsqlx = { version = "0.3.0", features = ["sqlite"] }
+sqlx = { version = "0.8", features = ["sqlite"] }
+hugsqlx = { version = "0.3.1", features = ["sqlite"] }
 ```
 
 Both HugSQLx and SQLx itself should have the same database mentioned in *features* (sqlite, postgres or mysql).
@@ -85,7 +85,7 @@ Both query- and result types can be mixed:
 When using Hugsqlx, you need to decide first what database (postgres, sqlite or mysql) the code should be generated for:
 
 ``` toml
-hugsqlx = {version = "0.3.0", features = ["sqlite"]}
+hugsqlx = {version = "0.3.1", features = ["sqlite"]}
 ```
 
 Having dependency added, time to add a struct:
@@ -118,7 +118,7 @@ let users = Users::fetch_users(&pool, params!("guest"), |row| { ... }).await?;
 Parameters need to be passed with `params!` macro due to Rust mechanism which forbids creating a vector of elements of different types.
 
 ## Conditional SQL blocks
-Sometimes query should include or exclude certain part of SQL depending on external condition. As an example imagine a request coming with 2 parameters: `tags_included` and `tags_excluded` - both can be empty. Now, a query returning tags could look like following:
+Sometimes a query needs to include or exclude certain parts of SQL depending on external conditions. For example, imagine a request with 2 parameters: `tags_included` and `tags_excluded` - either or both can be empty. A query returning tags might look more or less like the following:
 
 ``` sql
 SELECT name FROM tags
